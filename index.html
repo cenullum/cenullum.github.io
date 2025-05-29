@@ -138,7 +138,7 @@
         /* Cards */
         .cards-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(4, 1fr);
             gap: 30px;
             margin-top: 40px;
         }
@@ -268,6 +268,13 @@
         }
 
         /* Responsive */
+        @media (max-width: 1200px) {
+            .cards-grid {
+                grid-template-columns: repeat(2, 1fr);
+                gap: 25px;
+            }
+        }
+
         @media (max-width: 768px) {
             .language-switcher {
                 top: 10px;
@@ -325,21 +332,21 @@
 <body>
     <!-- Language Switcher -->
     <div class="language-switcher">
-        <a href="#" class="lang-btn active" data-lang="tr">TR</a>
-        <a href="#" class="lang-btn" data-lang="en">EN</a>
+        <a href="#" class="lang-btn" data-lang="tr">TR</a>
+        <a href="#" class="lang-btn active" data-lang="en">EN</a>
     </div>
 
     <!-- Hero Section -->
     <section class="hero">
         <div class="hero-content">
             <!-- Turkish Content -->
-            <div class="lang-content active" data-lang="tr">
+            <div class="lang-content" data-lang="tr">
                 <h1 class="hero-title">Cenker Cennet</h1>
                 <h2 class="hero-subtitle">Oyun Geliştiricisi</h2>
             </div>
             
             <!-- English Content -->
-            <div class="lang-content" data-lang="en">
+            <div class="lang-content active" data-lang="en">
                 <h1 class="hero-title">Cenker Cennet</h1>
                 <h2 class="hero-subtitle">Game Developer</h2>
             </div>
@@ -349,7 +356,7 @@
     <!-- Portfolio Section -->
     <section class="section">
         <!-- Turkish Content -->
-        <div class="lang-content active" data-lang="tr">
+        <div class="lang-content" data-lang="tr">
             <h2 class="section-title">Portföyüm</h2>
             <div class="cards-grid">
                 <div class="card">
@@ -380,6 +387,19 @@
                 
                 <div class="card">
                     <div class="card-icon">
+                        <i class="fas fa-road"></i>
+                    </div>
+                    <h3 class="card-title">Geliştirme Roadmap</h3>
+                    <p class="card-description">
+                        Oyunlarımın gelişim sürecini takip edin ve gelecek güncellemeleri görün.
+                    </p>
+                    <a href="./roadmap/" class="btn">
+                        <i class="fas fa-route"></i> Roadmap'i Görüntüle
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <div class="card-icon">
                         <i class="fas fa-play"></i>
                     </div>
                     <h3 class="card-title">Gameplay Videoları</h3>
@@ -394,7 +414,7 @@
         </div>
         
         <!-- English Content -->
-        <div class="lang-content" data-lang="en">
+        <div class="lang-content active" data-lang="en">
             <h2 class="section-title">My Portfolio</h2>
             <div class="cards-grid">
                 <div class="card">
@@ -425,6 +445,19 @@
                 
                 <div class="card">
                     <div class="card-icon">
+                        <i class="fas fa-road"></i>
+                    </div>
+                    <h3 class="card-title">Development Roadmap</h3>
+                    <p class="card-description">
+                        Follow my games' development progress and see upcoming updates.
+                    </p>
+                    <a href="./roadmap/" class="btn">
+                        <i class="fas fa-route"></i> View Roadmap
+                    </a>
+                </div>
+                
+                <div class="card">
+                    <div class="card-icon">
                         <i class="fas fa-play"></i>
                     </div>
                     <h3 class="card-title">Gameplay Videos</h3>
@@ -442,7 +475,7 @@
     <!-- Contact Section -->
     <section class="section">
         <!-- Turkish Content -->
-        <div class="lang-content active" data-lang="tr">
+        <div class="lang-content" data-lang="tr">
             <h2 class="section-title">İletişim</h2>
             <div class="notice">
                 <i class="fas fa-info-circle"></i>
@@ -477,7 +510,7 @@
         </div>
         
         <!-- English Content -->
-        <div class="lang-content" data-lang="en">
+        <div class="lang-content active" data-lang="en">
             <h2 class="section-title">Contact</h2>
             <div class="notice">
                 <i class="fas fa-info-circle"></i>
@@ -515,12 +548,12 @@
     <!-- Footer -->
     <footer class="footer">
         <!-- Turkish Content -->
-        <div class="lang-content active" data-lang="tr">
+        <div class="lang-content" data-lang="tr">
             <p>&copy; 2025 Cenker Cennet. Tüm hakları saklıdır.</p>
         </div>
         
         <!-- English Content -->
-        <div class="lang-content" data-lang="en">
+        <div class="lang-content active" data-lang="en">
             <p>&copy; 2025 Cenker Cennet. All rights reserved.</p>
         </div>
     </footer>
@@ -531,8 +564,8 @@
             const langButtons = document.querySelectorAll('.lang-btn');
             const langContents = document.querySelectorAll('.lang-content');
 
-            // Get saved language or default to Turkish
-            const savedLang = localStorage.getItem('selectedLanguage') || 'tr';
+            // Get saved language or default to English
+            const savedLang = localStorage.getItem('selectedLanguage') || 'en';
             switchLanguage(savedLang);
 
             langButtons.forEach(button => {
