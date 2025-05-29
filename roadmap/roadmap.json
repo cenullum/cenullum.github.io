@@ -3,54 +3,51 @@
         "title": "Roadmap",
         "subtitle": "Gelecek Projeler ve Fikirler",
         "description": "Üzerinde çalıştığım ve planladığım projeler.",
-        "items": [
+        "projects": [
             {
-                "id": "board-game-mods",
-                "title": "Masa Üstü Modları",
                 "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "survival-crafting-mod",
-                "title": "Prosedürel Hayatta Kalma Craft Modu",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "steam-workshop",
-                "title": "Steam Workshop Entegrasyonu",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "gamepad-integration",
-                "title": "Gamepad Entegrasyonu",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "multi-language-support",
-                "title": "Modlara Çoklu Dil Desteği",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "tween-animations",
-                "title": "Tween ile Animasyon",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "lsp-support",
-                "title": "LSP Desteği",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "horror-games",
-                "title": "Korku Modu",
-                "project": "Cenker's Mod",
-                "link": ""
+                "items": [
+                    {
+                        "id": "board-game-mods",
+                        "title": "Masa Üstü Modları",
+                        "link": ""
+                    },
+                    {
+                        "id": "survival-crafting-mod",
+                        "title": "Prosedürel Hayatta Kalma Craft Modu",
+                        "link": ""
+                    },
+                    {
+                        "id": "steam-workshop",
+                        "title": "Steam Workshop Entegrasyonu",
+                        "link": ""
+                    },
+                    {
+                        "id": "gamepad-integration",
+                        "title": "Gamepad Entegrasyonu",
+                        "link": ""
+                    },
+                    {
+                        "id": "multi-language-support",
+                        "title": "Modlara Çoklu Dil Desteği",
+                        "link": ""
+                    },
+                    {
+                        "id": "tween-animations",
+                        "title": "Tween ile Animasyon",
+                        "link": ""
+                    },
+                    {
+                        "id": "lsp-support",
+                        "title": "LSP Desteği",
+                        "link": ""
+                    },
+                    {
+                        "id": "horror-games",
+                        "title": "Korku Modu",
+                        "link": ""
+                    }
+                ]
             }
         ]
     },
@@ -58,54 +55,51 @@
         "title": "Roadmap",
         "subtitle": "Upcoming Projects and Ideas",
         "description": "Projects I'm working on and planning.",
-        "items": [
+        "projects": [
             {
-                "id": "board-game-mods",
-                "title": "Board Game Mods",
                 "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "survival-crafting-mod",
-                "title": "Procedural Survival Crafting Mod",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "steam-workshop",
-                "title": "Steam Workshop Integration",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "gamepad-integration",
-                "title": "Gamepad Integration",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "multi-language-support",
-                "title": "Multi-language Support for Mods",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "tween-animations",
-                "title": "Tween Animations",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "lsp-support",
-                "title": "LSP Support",
-                "project": "Cenker's Mod",
-                "link": ""
-            },
-            {
-                "id": "horror-games",
-                "title": "Horror Mod",
-                "project": "Cenker's Mod",
-                "link": ""
+                "items": [
+                    {
+                        "id": "board-game-mods",
+                        "title": "Board Game Mods",
+                        "link": ""
+                    },
+                    {
+                        "id": "survival-crafting-mod",
+                        "title": "Procedural Survival Crafting Mod",
+                        "link": ""
+                    },
+                    {
+                        "id": "steam-workshop",
+                        "title": "Steam Workshop Integration",
+                        "link": ""
+                    },
+                    {
+                        "id": "gamepad-integration",
+                        "title": "Gamepad Integration",
+                        "link": ""
+                    },
+                    {
+                        "id": "multi-language-support",
+                        "title": "Multi-language Support for Mods",
+                        "link": ""
+                    },
+                    {
+                        "id": "tween-animations",
+                        "title": "Tween Animations",
+                        "link": ""
+                    },
+                    {
+                        "id": "lsp-support",
+                        "title": "LSP Support",
+                        "link": ""
+                    },
+                    {
+                        "id": "horror-games",
+                        "title": "Horror Mod",
+                        "link": ""
+                    }
+                ]
             }
         ]
     }

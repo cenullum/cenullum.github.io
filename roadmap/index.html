@@ -159,24 +159,53 @@
             backdrop-filter: blur(10px);
         }
 
+        /* Project Groups */
+        .project-group {
+            margin-bottom: 40px;
+        }
+
+        .project-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .project-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .project-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 0;
+        }
+
+        .project-title i {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+
         .roadmap-item {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            padding: 20px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 15px 20px;
+            margin: 8px 0;
+            border-radius: 12px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.08);
             transition: all 0.3s ease;
         }
 
-        .roadmap-item:last-child {
-            border-bottom: none;
-        }
-
         .roadmap-item:hover {
-            background: rgba(255, 255, 255, 0.03);
-            margin: 0 -15px;
-            padding: 20px 15px;
-            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.08);
+            border-color: rgba(255, 255, 255, 0.15);
+            transform: translateX(8px);
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
         }
 
         .item-info {
@@ -184,11 +213,11 @@
         }
 
         .item-title {
-            font-size: 1.2rem;
-            font-weight: 600;
-            margin-bottom: 5px;
+            font-size: 1.1rem;
+            font-weight: 500;
             cursor: pointer;
             transition: color 0.3s ease;
+            position: relative;
         }
 
         .item-title:hover {
@@ -203,8 +232,12 @@
             color: var(--accent-color);
         }
 
-        .item-project {
-            font-size: 0.9rem;
+        .item-title.has-link::after {
+            content: '\f35d';
+            font-family: 'Font Awesome 6 Free';
+            font-weight: 900;
+            margin-left: 8px;
+            font-size: 0.8rem;
             opacity: 0.7;
         }
 
@@ -382,14 +415,39 @@
             document.getElementById('pageSubtitle').textContent = langData.subtitle;
             document.getElementById('pageDescription').textContent = langData.description;
 
-            // Render items
+            // Render projects
             const roadmapContainer = document.getElementById('roadmapContent');
             roadmapContainer.innerHTML = '';
 
-            langData.items.forEach(item => {
-                const itemElement = createItemElement(item);
-                roadmapContainer.appendChild(itemElement);
+            langData.projects.forEach(project => {
+                const projectElement = createProjectElement(project);
+                roadmapContainer.appendChild(projectElement);
             });
+        }
+
+        // Create project element
+        function createProjectElement(project) {
+            const projectDiv = document.createElement('div');
+            projectDiv.className = 'project-group';
+
+            // Project header
+            const projectHeader = document.createElement('div');
+            projectHeader.className = 'project-header';
+            projectHeader.innerHTML = `
+                <h3 class="project-title">
+                    <i class="fas fa-folder"></i>
+                    ${project.project}
+                </h3>
+            `;
+            projectDiv.appendChild(projectHeader);
+
+            // Project items
+            project.items.forEach(item => {
+                const itemElement = createItemElement(item);
+                projectDiv.appendChild(itemElement);
+            });
+
+            return projectDiv;
         }
 
         // Create item element
@@ -404,7 +462,6 @@
                     <div class="item-title ${hasLink ? 'has-link' : ''}" ${hasLink ? `onclick="window.open('${item.link}', '_blank')"` : ''}>
                         ${item.title}
                     </div>
-                    <div class="item-project">${item.project}</div>
                 </div>
             `;
 
