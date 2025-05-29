@@ -48,6 +48,111 @@
                         "link": ""
                     }
                 ]
+            },
+            {
+                "project": "Web Geliştirme Portföyü",
+                "items": [
+                    {
+                        "id": "personal-website-v2",
+                        "title": "Kişisel Website 2.0",
+                        "link": ""
+                    },
+                    {
+                        "id": "blog-platform",
+                        "title": "Özel Blog Platformu",
+                        "link": ""
+                    },
+                    {
+                        "id": "e-commerce-template",
+                        "title": "E-Ticaret Şablonu",
+                        "link": ""
+                    },
+                    {
+                        "id": "portfolio-generator",
+                        "title": "Portföy Üretici Aracı",
+                        "link": ""
+                    },
+                    {
+                        "id": "pwa-integration",
+                        "title": "PWA Entegrasyonu",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "Açık Kaynak Katkıları",
+                "items": [
+                    {
+                        "id": "open-source-library",
+                        "title": "JavaScript Kütüphanesi",
+                        "link": ""
+                    },
+                    {
+                        "id": "documentation-improvements",
+                        "title": "Dokümantasyon İyileştirmeleri",
+                        "link": ""
+                    },
+                    {
+                        "id": "bug-fixes",
+                        "title": "Hata Düzeltmeleri",
+                        "link": ""
+                    },
+                    {
+                        "id": "feature-contributions",
+                        "title": "Özellik Katkıları",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "Mobil Uygulama Geliştirme",
+                "items": [
+                    {
+                        "id": "react-native-app",
+                        "title": "React Native Uygulaması",
+                        "link": ""
+                    },
+                    {
+                        "id": "flutter-app",
+                        "title": "Flutter Uygulaması",
+                        "link": ""
+                    },
+                    {
+                        "id": "native-android",
+                        "title": "Native Android Uygulaması",
+                        "link": ""
+                    },
+                    {
+                        "id": "cross-platform-tools",
+                        "title": "Çapraz Platform Araçları",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "AI/ML Projeleri",
+                "items": [
+                    {
+                        "id": "nlp-chatbot",
+                        "title": "NLP Tabanlı Chatbot",
+                        "link": ""
+                    },
+                    {
+                        "id": "image-recognition",
+                        "title": "Görüntü Tanıma Sistemi",
+                        "link": ""
+                    },
+                    {
+                        "id": "data-analysis-tool",
+                        "title": "Veri Analizi Aracı",
+                        "link": ""
+                    },
+                    {
+                        "id": "ml-playground",
+                        "title": "ML Öğrenme Alanı",
+                        "link": ""
+                    }
+                ]
             }
         ]
     },
@@ -97,6 +202,111 @@
                     {
                         "id": "horror-games",
                         "title": "Horror Mod",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "Web Development Portfolio",
+                "items": [
+                    {
+                        "id": "personal-website-v2",
+                        "title": "Personal Website 2.0",
+                        "link": ""
+                    },
+                    {
+                        "id": "blog-platform",
+                        "title": "Custom Blog Platform",
+                        "link": ""
+                    },
+                    {
+                        "id": "e-commerce-template",
+                        "title": "E-commerce Template",
+                        "link": ""
+                    },
+                    {
+                        "id": "portfolio-generator",
+                        "title": "Portfolio Generator Tool",
+                        "link": ""
+                    },
+                    {
+                        "id": "pwa-integration",
+                        "title": "PWA Integration",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "Open Source Contributions",
+                "items": [
+                    {
+                        "id": "open-source-library",
+                        "title": "JavaScript Library",
+                        "link": ""
+                    },
+                    {
+                        "id": "documentation-improvements",
+                        "title": "Documentation Improvements",
+                        "link": ""
+                    },
+                    {
+                        "id": "bug-fixes",
+                        "title": "Bug Fixes",
+                        "link": ""
+                    },
+                    {
+                        "id": "feature-contributions",
+                        "title": "Feature Contributions",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "Mobile App Development",
+                "items": [
+                    {
+                        "id": "react-native-app",
+                        "title": "React Native App",
+                        "link": ""
+                    },
+                    {
+                        "id": "flutter-app",
+                        "title": "Flutter App",
+                        "link": ""
+                    },
+                    {
+                        "id": "native-android",
+                        "title": "Native Android App",
+                        "link": ""
+                    },
+                    {
+                        "id": "cross-platform-tools",
+                        "title": "Cross-platform Tools",
+                        "link": ""
+                    }
+                ]
+            },
+            {
+                "project": "AI/ML Projects",
+                "items": [
+                    {
+                        "id": "nlp-chatbot",
+                        "title": "NLP-based Chatbot",
+                        "link": ""
+                    },
+                    {
+                        "id": "image-recognition",
+                        "title": "Image Recognition System",
+                        "link": ""
+                    },
+                    {
+                        "id": "data-analysis-tool",
+                        "title": "Data Analysis Tool",
+                        "link": ""
+                    },
+                    {
+                        "id": "ml-playground",
+                        "title": "ML Learning Playground",
                         "link": ""
                     }
                 ]
