@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+Disallow: /jigsaw_puzzle_minimalist_privacy_policy/
+
+Sitemap: https://cenullum.com/sitemap.xml
