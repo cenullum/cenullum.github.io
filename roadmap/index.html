@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roadmap - Cenker Cennet</title>
     <meta name="description" content="Cenker Cennet - Development Roadmap">
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
     <style>
         * {
             margin: 0;
@@ -26,11 +26,15 @@
         }
 
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
             line-height: 1.6;
             color: var(--text-light);
             background: var(--dark-bg);
             overflow-x: hidden;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         }
 
         /* Header */
@@ -233,9 +237,7 @@
         }
 
         .item-title.has-link::after {
-            content: '\f35d';
-            font-family: 'Font Awesome 6 Free';
-            font-weight: 900;
+            content: '🔗';
             margin-left: 8px;
             font-size: 0.8rem;
             opacity: 0.7;
@@ -294,8 +296,7 @@
     <header class="header">
         <div class="header-content">
             <a href="../" class="home-link">
-                <i class="fas fa-arrow-left"></i>
-                <span data-tr="Anasayfa" data-en="Home">Home</span>
+                ← <span data-tr="Anasayfa" data-en="Home">Home</span>
             </a>
             
             <div class="language-switcher">
@@ -309,7 +310,7 @@
     <main class="main-content">
         <!-- Loading State -->
         <div class="loading" id="loading">
-            <i class="fas fa-spinner"></i>
+            ⏳
             <div data-tr="Roadmap yükleniyor..." data-en="Loading roadmap...">Loading roadmap...</div>
         </div>
 
@@ -393,7 +394,7 @@
             } catch (error) {
                 console.error('Error loading roadmap:', error);
                 document.getElementById('loading').innerHTML = `
-                    <i class="fas fa-exclamation-triangle"></i>
+                    ⚠️
                     <div>Error loading roadmap data</div>
                 `;
             }
@@ -435,8 +436,9 @@
             projectHeader.className = 'project-header';
             projectHeader.innerHTML = `
                 <h3 class="project-title">
-                    <i class="fas fa-folder"></i>
-                    ${project.project}
+                    <svg style="width: 1.2em; height: 1.2em; vertical-align: text-bottom; margin-right: 8px;" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M4 2v20h2V12h14l-2-4 2-4H6V2H4z"/>
+                    </svg>${project.project}
                 </h3>
             `;
             projectDiv.appendChild(projectHeader);
