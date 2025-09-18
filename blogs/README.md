@@ -38,6 +38,10 @@ blogs/
 
 6. **Sitemap'i Güncelleyin**: `sitemap.xml` dosyasına yeni blog yazısını ekleyin
 
+7. **Ana Sayfayı Güncelleyin**: Ana sayfadaki blog listesine yeni blog yazısını ekleyin (maksimum 5 blog)
+
+8. **Tüm Bloglar Sayfasını Güncelleyin**: `/blogs/index.html` dosyasına yeni blog yazısını ekleyin
+
 ## RSS Feed
 
 RSS feed dosyası: `/rss.xml`
@@ -75,12 +79,15 @@ Yeni blog yazısı eklediğinizde sitemap'e şu formatta ekleyin:
 - ✅ Responsive tasarım
 - ✅ Ana sayfaya dönüş butonu (site dil ayarına göre)
 - ✅ SEO optimizasyonu
-- ✅ RSS feed desteği
+- ✅ RSS feed desteği (SVG logo ile)
 - ✅ Sitemap entegrasyonu
 - ✅ Sosyal medya meta etiketleri
 - ✅ Okuma süresi gösterimi
 - ✅ Kategori sistemi
 - ✅ Tarih gösterimi
+- ✅ Tüm blog paneli tıklanabilir
+- ✅ Ana sayfada 5 blog sınırı
+- ✅ Tüm blogları gör sayfası
 
 ## Örnek Kullanım
 
