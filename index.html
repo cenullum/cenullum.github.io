@@ -383,6 +383,69 @@
             fill: currentColor !important;
             color: currentColor !important;
         }
+
+        /* Blog List */
+        .blog-list {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .blog-item {
+            background: var(--light-bg);
+            border-radius: 8px;
+            padding: 25px;
+            border: 1px solid var(--primary-color);
+            transition: all 0.3s ease;
+        }
+
+        .blog-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border-color: var(--accent-color);
+        }
+
+        .blog-item-title {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .blog-item-title a {
+            color: var(--text-light);
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        .blog-item-title a:hover {
+            color: var(--accent-color);
+        }
+
+        .blog-item-description {
+            color: var(--accent-color);
+            margin-bottom: 15px;
+            line-height: 1.6;
+        }
+
+        .blog-item-meta {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        .blog-date {
+            color: var(--accent-color);
+            font-size: 0.9rem;
+        }
+
+        .blog-category {
+            background: var(--primary-color);
+            color: var(--text-light);
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -531,6 +594,63 @@
                         Watch Videos
                     </a>
                 </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Blog Section -->
+    <section class="section">
+        <!-- Turkish Content -->
+        <div class="lang-content" data-lang="tr">
+            <h2 class="section-title">Blog Yazılarım</h2>
+            <div class="blog-list">
+                <div class="blog-item">
+                    <div class="blog-item-content">
+                        <h3 class="blog-item-title">
+                            <a href="./blogs/hello_world/">Hello World!</a>
+                        </h3>
+                        <p class="blog-item-description">My first blog post! About my game development journey and future plans.</p>
+                        <div class="blog-item-meta">
+                            <span class="blog-date">📅 2025-01-27</span>
+                            <span class="blog-category">Personal</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="./rss.xml" class="btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; margin-right: 8px;">
+                        <path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248S0 22.546 0 20.752s1.456-3.248 3.252-3.248c1.794 0 3.251 1.454 3.251 3.248zM2.834 6.955v7.904c0 .779.632 1.41 1.41 1.41.78 0 1.41-.631 1.41-1.41V6.955c0-.779-.63-1.41-1.41-1.41-.778 0-1.41.631-1.41 1.41zM17.337 12.004c-4.407-.11-7.89-3.592-7.99-7.99-.034-.776.597-1.42 1.373-1.42.78 0 1.42.597 1.42 1.373.09 3.592 3.006 6.508 6.598 6.598.776 0 1.42.64 1.42 1.42 0 .776-.64 1.407-1.42 1.407zM12.34 12.004c-2.78-.07-5.01-2.3-5.08-5.08-.034-.776.597-1.42 1.373-1.42.78 0 1.42.597 1.42 1.373.05 1.78 1.47 3.2 3.25 3.25.776 0 1.42.64 1.42 1.42 0 .776-.64 1.407-1.42 1.407z"/>
+                    </svg>
+                    RSS Feed
+                </a>
+            </div>
+        </div>
+        
+        <!-- English Content -->
+        <div class="lang-content active" data-lang="en">
+            <h2 class="section-title">My Blog Posts</h2>
+            <div class="blog-list">
+                <div class="blog-item">
+                    <div class="blog-item-content">
+                        <h3 class="blog-item-title">
+                            <a href="./blogs/hello_world/">Hello World!</a>
+                        </h3>
+                        <p class="blog-item-description">My first blog post! About my game development journey and future plans.</p>
+                        <div class="blog-item-meta">
+                            <span class="blog-date">📅 2025-01-27</span>
+                            <span class="blog-category">Personal</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div style="text-align: center; margin-top: 30px;">
+                <a href="./rss.xml" class="btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width: 16px; height: 16px; margin-right: 8px;">
+                        <path d="M6.503 20.752c0 1.794-1.456 3.248-3.251 3.248S0 22.546 0 20.752s1.456-3.248 3.252-3.248c1.794 0 3.251 1.454 3.251 3.248zM2.834 6.955v7.904c0 .779.632 1.41 1.41 1.41.78 0 1.41-.631 1.41-1.41V6.955c0-.779-.63-1.41-1.41-1.41-.778 0-1.41.631-1.41 1.41zM17.337 12.004c-4.407-.11-7.89-3.592-7.99-7.99-.034-.776.597-1.42 1.373-1.42.78 0 1.42.597 1.42 1.373.09 3.592 3.006 6.508 6.598 6.598.776 0 1.42.64 1.42 1.42 0 .776-.64 1.407-1.42 1.407zM12.34 12.004c-2.78-.07-5.01-2.3-5.08-5.08-.034-.776.597-1.42 1.373-1.42.78 0 1.42.597 1.42 1.373.05 1.78 1.47 3.2 3.25 3.25.776 0 1.42.64 1.42 1.42 0 .776-.64 1.407-1.42 1.407z"/>
+                    </svg>
+                    RSS Feed
+                </a>
             </div>
         </div>
     </section>
