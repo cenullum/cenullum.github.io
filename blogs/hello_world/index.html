@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hello World - Cenker Cennet</title>
+    <meta name="description" content="My first blog post! About my game development journey and future plans.">
+    <meta name="keywords" content="hello world, blog, game development, indie games, cenker cennet, cenullum">
+    <meta name="author" content="Cenker Cennet">
+    <meta property="og:title" content="Hello World - Cenker Cennet">
+    <meta property="og:description" content="My first blog post! About my game development journey and future plans.">
+    <meta property="og:url" content="https://cenullum.com/blogs/hello_world/">
+    <meta property="og:type" content="article">
+    <meta name="twitter:card" content="summary">
+    <meta name="twitter:title" content="Hello World - Cenker Cennet">
+    <meta name="twitter:description" content="My first blog post! About my game development journey and future plans.">
+    <link rel="canonical" href="https://cenullum.com/blogs/hello_world/">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+    
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #6b7280;
+            --secondary-color: #4b5563;
+            --accent-color: #9ca3af;
+            --dark-bg: #050505;
+            --light-bg: #19191b;
+            --text-light: #fff;
+            --text-dark: #333;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            --gradient: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        body {
+            font-family: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-light);
+            background: var(--dark-bg);
+            overflow-x: hidden;
+        }
+
+        h1, h2, h3, h4, h5, h6, .hero-title, .section-title, .card-title {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--light-bg);
+            z-index: 1000;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--primary-color);
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .home-link {
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .home-link:hover {
+            color: var(--accent-color);
+        }
+
+        /* Language Switcher */
+        .language-switcher {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 8px 12px;
+            background: var(--dark-bg);
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .lang-btn:hover,
+        .lang-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .main-content {
+            margin-top: 80px;
+            padding: 40px 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .blog-header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding-bottom: 30px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .blog-title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-light);
+            line-height: 1.2;
+        }
+
+        .blog-meta {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+
+        .meta-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--accent-color);
+            font-size: 0.9rem;
+        }
+
+        .blog-category {
+            background: var(--primary-color);
+            color: var(--text-light);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .blog-image {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            border-radius: 8px;
+            margin: 30px auto;
+            display: block;
+            box-shadow: var(--shadow);
+        }
+
+        .blog-content {
+            background: var(--light-bg);
+            border-radius: 8px;
+            padding: 40px;
+            margin-bottom: 40px;
+            box-shadow: var(--shadow);
+        }
+
+        .blog-content h2 {
+            font-size: 1.8rem;
+            margin: 30px 0 15px 0;
+            color: var(--accent-color);
+            border-bottom: 1px solid var(--primary-color);
+            padding-bottom: 10px;
+        }
+
+        .blog-content h3 {
+            font-size: 1.4rem;
+            margin: 25px 0 10px 0;
+            color: var(--text-light);
+        }
+
+        .blog-content p {
+            margin-bottom: 15px;
+            line-height: 1.7;
+        }
+
+        .blog-content ul {
+            margin: 15px 0 15px 20px;
+        }
+
+        .blog-content li {
+            margin-bottom: 8px;
+        }
+
+        .blog-content blockquote {
+            border-left: 4px solid var(--primary-color);
+            padding-left: 20px;
+            margin: 20px 0;
+            font-style: italic;
+            color: var(--accent-color);
+        }
+
+        .blog-content a {
+            color: var(--accent-color);
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .blog-content a:hover {
+            color: var(--text-light);
+            border-bottom-color: var(--accent-color);
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 15px;
+                padding: 10px 0;
+            }
+
+            .main-content {
+                margin-top: 120px;
+                padding: 20px 15px;
+            }
+
+            .blog-content {
+                padding: 25px 20px;
+            }
+
+            .blog-meta {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .blog-title {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-content">
+            <a href="../../" class="home-link">
+                ← <span data-tr="Anasayfa" data-en="Home">Home</span>
+            </a>
+            
+            <div class="language-switcher">
+                <a href="#" class="lang-btn" data-lang="tr">TR</a>
+                <a href="#" class="lang-btn active" data-lang="en">EN</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="main-content">
+        <div class="blog-header">
+            <h1 class="blog-title">Hello World!</h1>
+            <div class="blog-meta">
+                <div class="meta-item">
+                    <span>📅</span>
+                    <span>2025-01-27</span>
+                </div>
+                <div class="meta-item">
+                    <span>⏱️</span>
+                    <span>3 minutes</span>
+                </div>
+                <div class="meta-item">
+                    <span>🏷️</span>
+                    <span class="blog-category">Personal</span>
+                </div>
+            </div>
+            <div class="blog-image-container">
+                <img src="a.webp" alt="My cat" class="blog-image">
+            </div>
+        </div>
+
+        <article class="blog-content">
+            <p>Hello! This is my first blog post where I'll be sharing my game development journey with you.</p>
+            <img src="a.webp" alt="My cat" class="blog-image">
+            <blockquote>
+                "Blockquote looks like this"
+            </blockquote>
+            
+            <p><strong>P.S.</strong> Don't forget to follow the RSS feed to stay updated with my latest posts!</p>
+        </article>
+    </main>
+
+    <script>
+        // Language switching functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const langButtons = document.querySelectorAll('.lang-btn');
+            const langContents = document.querySelectorAll('[data-tr]');
+
+            // Get saved language or default to English
+            const savedLang = localStorage.getItem('selectedLanguage') || 'en';
+            switchLanguage(savedLang);
+
+            langButtons.forEach(button => {
+                button.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const selectedLang = this.getAttribute('data-lang');
+                    switchLanguage(selectedLang);
+                    localStorage.setItem('selectedLanguage', selectedLang);
+                });
+            });
+
+            function switchLanguage(lang) {
+                // Update active button
+                langButtons.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.getAttribute('data-lang') === lang) {
+                        btn.classList.add('active');
+                    }
+                });
+
+                // Update content
+                langContents.forEach(content => {
+                    const trText = content.getAttribute('data-tr');
+                    const enText = content.getAttribute('data-en');
+                    content.textContent = lang === 'tr' ? trText : enText;
+                });
+
+                // Update document language
+                document.documentElement.lang = lang;
+            }
+        });
+    </script>
+</body>
+</html>
