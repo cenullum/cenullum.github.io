@@ -5,7 +5,7 @@
         <description>Oyun geliştirme, pixel art ve indie oyun dünyasından yazılar</description>
         <link>https://cenullum.com</link>
         <language>tr</language>
-        <lastBuildDate>Mon, 27 Jan 2025 12:00:00 +0000</lastBuildDate>
+        <lastBuildDate>Thu, 19 Sep 2025 12:00:00 +0000</lastBuildDate>
         <atom:link href="https://cenullum.com/rss.xml" rel="self" type="application/rss+xml"/>
         
         <item>
@@ -13,7 +13,7 @@
             <description>My first blog post! About my game development journey and future plans.</description>
             <link>https://cenullum.com/blogs/hello_world/</link>
             <guid isPermaLink="true">https://cenullum.com/blogs/hello_world/</guid>
-            <pubDate>Mon, 27 Jan 2025 12:00:00 +0000</pubDate>
+            <pubDate>Thu, 19 Sep 2025 12:00:00 +0000</pubDate>
             <category>Personal</category>
         </item>
     </channel>

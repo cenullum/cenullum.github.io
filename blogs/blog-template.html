@@ -30,7 +30,7 @@
        - BLOG_DESCRIPTION: Blog yazısının açıklaması
        - BLOG_KEYWORDS: Blog yazısı için anahtar kelimeler (virgülle ayrılmış)
        - BLOG_URL: Blog yazısının tam URL'si
-       - BLOG_DATE: Yayın tarihi (YYYY-MM-DD formatında)
+       - BLOG_DATE: Yayın tarihi (YYYY-MM-DD formatında) - ÖNEMLİ: Doğru tarihi kullan!
        - BLOG_READ_TIME: Tahmini okuma süresi (örn: "5 dakika")
        - BLOG_CATEGORY: Blog kategorisi (örn: "Oyun Geliştirme", "Pixel Art")
        - BLOG_IMAGE: Blog yazısı için ana görsel (klasör içindeki dosya adı)
@@ -51,12 +51,53 @@
     │   ├── screenshot1.png
     │   └── diagram.svg
     
+    TARİH FORMATLARI:
+    - Blog içinde: YYYY-MM-DD (örn: 2025-09-19)
+    - RSS feed'de: RFC 2822 format (örn: Thu, 19 Sep 2025 12:00:00 +0000)
+    - Sitemap'te: YYYY-MM-DD (örn: 2025-09-19)
+    - ÖNEMLİ: Tarihi internetten kontrol et, sistem tarihini kullanma!
+    
+    GÜNCELLENMESİ GEREKEN DOSYALAR:
+    1. Blog dosyası (index.html) - BLOG_DATE placeholder'ı
+    2. Ana sayfa (index.html) - blog listesindeki tarih
+    3. Tüm bloglar sayfası (/blogs/index.html) - blog listesindeki tarih
+    4. RSS feed (/rss.xml) - lastBuildDate ve pubDate
+    5. Sitemap (/sitemap.xml) - lastmod
+    
     RSS FEED:
     - Yeni blog yazısı eklendiğinde RSS feed'i güncellemeyi unutmayın
     - RSS feed: /rss.xml
+    - RSS logo: /rss_feed_logo.svg (SVG formatında)
     
     SİTEMAP:
     - Yeni blog yazısı eklendiğinde sitemap.xml'i güncellemeyi unutmayın
+    
+    ANA SAYFA BLOG LİSTESİ:
+    - Maksimum 5 blog gösterilir
+    - En yeni bloglar üstte
+    - 5'ten fazla blog varsa eski olanları kaldır
+    - "Tüm Blogları Gör" butonu ile /blogs/ sayfasına yönlendir
+    
+    TÜM BLOGLAR SAYFASI:
+    - /blogs/index.html dosyası
+    - Tüm blogların listesi
+    - Tarih sıralı (en yeni üstte)
+    - Her blog paneli tıklanabilir (onclick event)
+    
+    BLOG PANELİ TIKLANABİLİRLİĞİ:
+    - Tüm blog paneli tıklanabilir (sadece başlık değil)
+    - onclick="window.location.href='./blog_adi/'" kullan
+    - cursor: pointer CSS eklendi
+    
+    MOBİL UYUMLULUK:
+    - Scroll indicator mobilde daha yukarıda (bottom: 60px)
+    - Responsive tasarım mevcut
+    - Blog panelleri mobilde düzgün görünür
+    
+    DİL DESTEĞİ:
+    - Ana sayfa butonu site dil ayarına göre değişir
+    - Blog içeriği tek dil (hangi dilde yazarsan o dilde kalır)
+    - Dil değiştirme sadece ana sayfa butonu için çalışır
     -->
     
     <style>
