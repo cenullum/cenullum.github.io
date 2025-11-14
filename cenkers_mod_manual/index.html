@@ -238,13 +238,73 @@
             h1 { font-size: 1.6em; }
             h2 { font-size: 1.4em; }
             h3 { font-size: 1.2em; }
+            h4 { font-size: 1.1em; }
 
-            pre {
-                font-size: 0.85em;
+            /* Better text readability on mobile */
+            body {
+                font-size: 14px;
+                line-height: 1.7;
             }
 
+            p, li {
+                word-wrap: break-word;
+                overflow-wrap: break-word;
+            }
+
+            /* Improved code block handling for mobile */
+            pre {
+                font-size: 0.75em;
+                padding: 12px;
+                overflow-x: auto;
+                white-space: pre;
+                word-wrap: normal;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            code {
+                font-size: 0.85em;
+                word-wrap: break-word;
+            }
+
+            pre code {
+                font-size: 1em;
+            }
+
+            /* Better table handling */
             table {
-                font-size: 0.9em;
+                font-size: 0.8em;
+                display: block;
+                overflow-x: auto;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            th, td {
+                padding: 8px;
+                min-width: 80px;
+            }
+
+            /* Better spacing for mobile */
+            .highlight, .note, .warning {
+                padding: 10px 14px;
+                font-size: 0.95em;
+            }
+
+            .toc {
+                padding: 15px;
+                font-size: 0.95em;
+            }
+
+            ul, ol {
+                padding-left: 25px;
+            }
+
+            /* Function signatures more readable on mobile */
+            .function-signature {
+                font-size: 0.75em;
+                padding: 8px;
+                overflow-x: auto;
+                white-space: pre;
             }
         }
     </style>
@@ -266,13 +326,8 @@
             </div>
 
             <div class="note">
-                <strong>💾 Offline Access:</strong> Please download this manual from your browser (File → Save Page As) to access it offline while modding. 
+                <strong>💾 Offline Access:</strong> Please download this manual from your browser (File → Save Page As) to access it offline while modding. Additionally, every mod folder includes <code>cenkers_mod_stub.lua</code> which contains detailed API type definitions and documentation comments for all available functions.
             </div>
-			<div class="note">
-				<strong>💡 LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in every mod folder) contains detailed API type definitions and documentation comments for all available functions. You can use this file with external editors that support <strong>luaLSP</strong> for features like <strong>code suggestions</strong> and <strong>code completion</strong>, as there is currently <strong>no built-in LSP support</strong> in Cenker's Mod.
-			</div>
-
-
 
             <div class="toc">
                 <h3>Table of Contents</h3>
@@ -753,7 +808,7 @@ set_value("", name, "linear_velocity", Vector2(50, 0))</code></pre>
 
     if IS_LOCAL then
         -- Check input
-        if inputs["key_7"] then  -- Interact key (E / Square / X)
+        if inputs["key_6"] then  -- Interact key (E / Square / Y)
             -- Perform action
         end
 
