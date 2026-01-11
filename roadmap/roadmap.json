@@ -18,16 +18,6 @@
                         "link": ""
                     },
                     {
-                        "id": "steam-workshop",
-                        "title": "Steam Workshop Entegrasyonu",
-                        "link": ""
-                    },
-                    {
-                        "id": "gamepad-integration",
-                        "title": "Gamepad Entegrasyonu",
-                        "link": ""
-                    },
-                    {
                         "id": "multi-language-support",
                         "title": "Modlara Çoklu Dil Desteği",
                         "link": ""
@@ -38,13 +28,13 @@
                         "link": ""
                     },
                     {
-                        "id": "lsp-support",
-                        "title": "LSP Desteği",
+                        "id": "horror-games",
+                        "title": "Korku Modu",
                         "link": ""
                     },
                     {
-                        "id": "horror-games",
-                        "title": "Korku Modu",
+                        "id": "light-system",
+                        "title": "Işık Sistemi",
                         "link": ""
                     }
                 ]
@@ -70,16 +60,6 @@
                         "link": ""
                     },
                     {
-                        "id": "steam-workshop",
-                        "title": "Steam Workshop Integration",
-                        "link": ""
-                    },
-                    {
-                        "id": "gamepad-integration",
-                        "title": "Gamepad Integration",
-                        "link": ""
-                    },
-                    {
                         "id": "multi-language-support",
                         "title": "Multi-language Support for Mods",
                         "link": ""
@@ -90,17 +70,17 @@
                         "link": ""
                     },
                     {
-                        "id": "lsp-support",
-                        "title": "LSP Support",
+                        "id": "horror-games",
+                        "title": "Horror Mod",
                         "link": ""
                     },
                     {
-                        "id": "horror-games",
-                        "title": "Horror Mod",
+                        "id": "light-system",
+                        "title": "Light System",
                         "link": ""
                     }
                 ]
             }
         ]
     }
-} 
+}

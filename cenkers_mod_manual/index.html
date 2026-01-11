@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="robots" content="noindex, nofollow">
     <title>Cenker's Mod - Manual</title>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
     <style>
         :root {
             --bg-primary: #050505;
@@ -45,17 +47,39 @@
             transition: background 0.3s ease, color 0.3s ease;
         }
 
-        h1, h2, h3, h4, h5, h6 {
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
             margin-top: 1.5em;
             margin-bottom: 0.5em;
             color: var(--text-primary);
         }
 
-        h1 { font-size: 2.2em; font-weight: 700; }
-        h2 { font-size: 1.8em; font-weight: 700; border-bottom: 2px solid var(--border-color); padding-bottom: 0.3em; }
-        h3 { font-size: 1.4em; font-weight: 600; }
-        h4 { font-size: 1.2em; font-weight: 600; }
+        h1 {
+            font-size: 2.2em;
+            font-weight: 700;
+        }
+
+        h2 {
+            font-size: 1.8em;
+            font-weight: 700;
+            border-bottom: 2px solid var(--border-color);
+            padding-bottom: 0.3em;
+        }
+
+        h3 {
+            font-size: 1.4em;
+            font-weight: 600;
+        }
+
+        h4 {
+            font-size: 1.2em;
+            font-weight: 600;
+        }
 
         .container {
             max-width: 1200px;
@@ -66,7 +90,7 @@
         .header {
             background: var(--bg-secondary);
             border-radius: 3px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
             padding: 40px 28px;
             margin-bottom: 32px;
             text-align: center;
@@ -95,7 +119,7 @@
         .content {
             background: var(--bg-secondary);
             border-radius: 3px;
-            box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
             padding: 40px 28px 32px 28px;
         }
 
@@ -143,7 +167,8 @@
             opacity: 0.8;
         }
 
-        ul, ol {
+        ul,
+        ol {
             margin: 16px 0;
             padding-left: 30px;
         }
@@ -159,7 +184,8 @@
             background: var(--bg-tertiary);
         }
 
-        th, td {
+        th,
+        td {
             border: 1px solid var(--border-color);
             padding: 12px;
             text-align: left;
@@ -224,7 +250,8 @@
                 padding: 10px;
             }
 
-            .header, .content {
+            .header,
+            .content {
                 padding: 20px 16px;
             }
 
@@ -235,10 +262,21 @@
                 width: fit-content;
             }
 
-            h1 { font-size: 1.6em; }
-            h2 { font-size: 1.4em; }
-            h3 { font-size: 1.2em; }
-            h4 { font-size: 1.1em; }
+            h1 {
+                font-size: 1.6em;
+            }
+
+            h2 {
+                font-size: 1.4em;
+            }
+
+            h3 {
+                font-size: 1.2em;
+            }
+
+            h4 {
+                font-size: 1.1em;
+            }
 
             /* Better text readability on mobile */
             body {
@@ -246,7 +284,8 @@
                 line-height: 1.7;
             }
 
-            p, li {
+            p,
+            li {
                 word-wrap: break-word;
                 overflow-wrap: break-word;
             }
@@ -279,13 +318,16 @@
                 -webkit-overflow-scrolling: touch;
             }
 
-            th, td {
+            th,
+            td {
                 padding: 8px;
                 min-width: 80px;
             }
 
             /* Better spacing for mobile */
-            .highlight, .note, .warning {
+            .highlight,
+            .note,
+            .warning {
                 padding: 10px 14px;
                 font-size: 0.95em;
             }
@@ -295,7 +337,8 @@
                 font-size: 0.95em;
             }
 
-            ul, ol {
+            ul,
+            ol {
                 padding-left: 25px;
             }
 
@@ -309,28 +352,37 @@
         }
     </style>
 </head>
+
 <body>
     <div class="container">
         <div class="header">
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">☀️ Light Mode</button>
             <h1>Cenker's Mod - Manual</h1>
             <p style="font-size: 1.2em; margin-top: 10px;">Version 2.1.0</p>
-            <p style="margin-top: 10px; color: var(--text-secondary);">A multiplayer game that hosts multiple mini-games and enables community mod creation</p>
+            <p style="margin-top: 10px; color: var(--text-secondary);">A multiplayer game that hosts multiple mini-games
+                and enables community mod creation</p>
         </div>
 
         <div class="content">
             <div class="highlight">
                 <p><strong>Copyright © 2023-Present Durmuş Cenker Cennet (cenullum)</strong><br>
-                <a href="https://www.cenullum.com" target="_blank">https://www.cenullum.com</a></p>
-                <p style="margin-top: 10px;">Cenker's Mod is built with <strong>Godot Engine</strong>, <strong>Lua 5.4</strong>, and <strong>Weasel Games Godot Lua API</strong>.</p>
+                    <a href="https://www.cenullum.com" target="_blank">https://www.cenullum.com</a>
+                </p>
+                <p style="margin-top: 10px;">Cenker's Mod is built with <strong>Godot Engine</strong>, <strong>Lua
+                        5.4</strong>, and <strong>Weasel Games Godot Lua API</strong>.</p>
             </div>
 
             <div class="note">
-                 <strong>💾 Offline Access:</strong> Please download this manual from your browser (File → Save Page As) to access it offline while modding. 
+                <strong>💾 Offline Access:</strong> Please download this manual from your browser (Save Page As)
+                to access it offline while modding.
             </div>
-			<div class="note">
-				<strong>💡 LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in every mod folder) contains detailed API type definitions and documentation comments for all available functions. You can use this file with external editors that support <strong>luaLSP</strong> for features like <strong>code suggestions</strong> and <strong>code completion</strong>, as there is currently <strong>no built-in LSP support</strong> in Cenker's Mod.
-			</div>
+            <div class="note">
+                <strong>💡 LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in
+                every mod folder) contains detailed API type definitions and documentation comments for all available
+                functions. You can use this file with external editors that support <strong>luaLSP</strong> for features
+                like <strong>code suggestions</strong> and <strong>code completion</strong>, as there is currently
+                <strong>no built-in LSP support</strong> in Cenker's Mod.
+            </div>
 
             <div class="toc">
                 <h3>Table of Contents</h3>
@@ -360,7 +412,10 @@
             </div>
 
             <h2 id="introduction">1. Introduction</h2>
-            <p><strong>Important:</strong> Cenker's Mod is NOT a game engine. It is a multiplayer game that hosts multiple mini-games within it. Players can create their own mods using Lua 5.4 scripting and play together online. The game handles networking, physics, rendering, and input management, allowing you to focus on creating unique gameplay experiences.</p>
+            <p><strong>Important:</strong> Cenker's Mod is NOT a game engine. It is a multiplayer game that hosts
+                multiple mini-games within it. Players can create their own mods using Lua 5.4 scripting and play
+                together online. The game handles networking, physics, rendering, and input management, allowing you to
+                focus on creating unique gameplay experiences.</p>
 
             <div class="note">
                 <strong>Lua Environment:</strong> The game uses Lua 5.4 with the following standard libraries available:
@@ -370,7 +425,8 @@
                     <li><strong>string</strong> - String operations</li>
                     <li><strong>math</strong> - Mathematical functions</li>
                 </ul>
-                Other Lua libraries (io, os, debug, etc.) are NOT available for security reasons. Use the provided API functions instead (e.g., <code>get_os_time()</code> for time, <code>save_json()</code> for file I/O).
+                Other Lua libraries (io, os, debug, etc.) are NOT available for security reasons. Use the provided API
+                functions instead (e.g., <code>get_os_time()</code> for time, <code>save_json()</code> for file I/O).
             </div>
 
             <h3>Key Features</h3>
@@ -389,7 +445,8 @@
             <p>The game comes with three example mods that demonstrate different gameplay styles:</p>
             <ul>
                 <li><strong>Football:</strong> A competitive team-based sports game</li>
-                <li><strong>Hook Up:</strong> A physics-based platformer with grappling hook mechanics and fishing minigame</li>
+                <li><strong>Hook Up:</strong> A physics-based platformer with grappling hook mechanics and fishing
+                    minigame</li>
                 <li><strong>Campfire Survivors:</strong> A cooperative survival game with wave-based enemies</li>
             </ul>
 
@@ -409,14 +466,17 @@
 └── cenkers_mod_stub.lua # API type definitions (optional)</code></pre>
 
             <div class="note">
-                <strong>Note:</strong> The <code>user.lua</code> script is mandatory for player entities. The <code>world.lua</code> singleton is recommended for managing game state.
+                <strong>Note:</strong> The <code>user.lua</code> script is mandatory for player entities. The
+                <code>world.lua</code> singleton is recommended for managing game state.
             </div>
 
             <h3>Your First Entity</h3>
             <p>Create a simple entity in <code>general/scripts/my_entity.lua</code>:</p>
 
             <div class="note">
-                <strong>Variable Declaration Rules:</strong> Variables at the top of the script (before any function, comment, or blank line) must be primitive types (numbers, strings, booleans). These special configuration variables are parsed before script execution. See the list of special variables below.
+                <strong>Variable Declaration Rules:</strong> Variables at the top of the script (before any function,
+                comment, or blank line) must be primitive types (numbers, strings, booleans). These special
+                configuration variables are parsed before script execution. See the list of special variables below.
             </div>
 
             <pre><code>-- Set entity properties at the top (MUST be primitive values)
@@ -454,16 +514,20 @@ set_collision({
             <h2 id="architecture">3. Game Architecture</h2>
 
             <h3 id="entities">3.1 Entities</h3>
-            <p>Entities are the fundamental building blocks of your game. Each entity is a Lua script that defines behavior and properties. The game automatically creates a RigidBody2D node for each entity.</p>
+            <p>Entities are the fundamental building blocks of your game. Each entity is a Lua script that defines
+                behavior and properties. The game automatically creates a RigidBody2D node for each entity.</p>
 
             <div class="note">
-                <strong>Entity Global Scope:</strong> Each entity has its own separate global Lua environment. Variables declared without <code>local</code> are global to that entity only. There is no shared global table (<code>_G</code>) between entities - each entity's globals are isolated from other entities.
+                <strong>Entity Global Scope:</strong> Each entity has its own separate global Lua environment. Variables
+                declared without <code>local</code> are global to that entity only. There is no shared global table
+                (<code>_G</code>) between entities - each entity's globals are isolated from other entities.
             </div>
 
             <div class="warning">
                 <strong>Important Physics Limitations:</strong>
                 <ul>
-                    <li>Maximum velocity for any entity is <strong>300</strong> (linear velocity magnitude is capped)</li>
+                    <li>Maximum velocity for any entity is <strong>300</strong> (linear velocity magnitude is capped)
+                    </li>
                     <li>Z-index values must be between <strong>-999</strong> and <strong>999</strong></li>
                 </ul>
             </div>
@@ -537,7 +601,9 @@ function _process(delta, inputs)
 end</code></pre>
 
             <h3 id="singletons">3.2 Singletons</h3>
-            <p>Singletons are special entities that exist once per game and manage global state. They are prefixed with <code>-</code> for network efficiency.</p>
+            <p>Singletons are special entities that exist once per game and manage global state. They are prefixed with
+                <code>-</code> and short names are recommended for network efficiency.
+            </p>
 
             <pre><code>-- Define as singleton at the top of your script
 singleton_name = "-game_manager"
@@ -546,12 +612,10 @@ singleton_name = "-game_manager"
 run_function("-game_manager", "start_game", {})</code></pre>
 
             <div class="note">
-                <strong>Best Practice:</strong> Use short singleton names (like <code>-gm</code>, <code>-ui</code>) to reduce network traffic.
+                <strong>Best Practice:</strong> Use short singleton names (like <code>-gm</code>, <code>-ui</code>) to
+                reduce network traffic.
             </div>
 
-            <div class="warning">
-                <strong>Important:</strong> If a singleton is created via code (using <code>spawn_entity_host</code> or <code>spawn_entity_local</code>), it will NOT become a singleton even if <code>singleton_name</code> is set in the script. Singletons must be spawned from the map or world initialization.
-            </div>
 
             <h3 id="network-mode">3.3 Network Modes</h3>
             <p>Network synchronization is controlled by the <code>network_mode</code> variable:</p>
@@ -584,11 +648,14 @@ run_function("-game_manager", "start_game", {})</code></pre>
             </table>
 
             <div class="warning">
-                <strong>Security Warning:</strong> ALL variables in STATIC (1) and DYNAMIC (2) entities are sent from host to clients when players join. This includes all script variables. Be careful with sensitive data - store it in non-networked entities or use local-only variables (declared with <code>local</code>).
+                <strong>Security Warning:</strong> ALL variables in STATIC (1) and DYNAMIC (2) entities are sent from
+                host to clients when players join. This includes all script variables. Be careful with sensitive data -
+                store it in non-networked entities or use local-only variables (declared with <code>local</code>).
             </div>
 
             <div class="note">
-                <strong>Note:</strong> DYNAMIC entities automatically sync position, rotation, and linear velocity. STATIC entities stay in place and don't sync movement.
+                <strong>Note:</strong> DYNAMIC entities automatically sync position, rotation, and linear velocity.
+                STATIC entities stay in place and don't sync movement.
             </div>
 
             <h4>Network Functions</h4>
@@ -625,7 +692,8 @@ run_function("-game_manager", "start_game", {})</code></pre>
                 <strong>Critical Requirements for Network Functions:</strong>
                 <ul>
                     <li>Function name MUST end with <code>_HOST</code>, <code>_ALL</code>, or <code>_CLIENT</code></li>
-                    <li>First parameter MUST be named <code>sender_id</code> (the Steam ID of who called the function)</li>
+                    <li>First parameter MUST be named <code>sender_id</code> (the Steam ID of who called the function)
+                    </li>
                     <li>Network functions without these suffixes will NOT work</li>
                 </ul>
                 <pre><code>function my_function_HOST(sender_id, other_params)
@@ -634,7 +702,9 @@ end</code></pre>
             </div>
 
             <div class="warning">
-                <strong>Security Rule:</strong> Always validate player actions on the host before applying them! Clients should only send requests, and the host should validate and execute the actual game logic to prevent cheating.
+                <strong>Security Rule:</strong> Always validate player actions on the host before applying them! Clients
+                should only send requests, and the host should validate and execute the actual game logic to prevent
+                cheating.
             </div>
 
             <h4>Network Function Examples</h4>
@@ -782,7 +852,11 @@ end</code></pre>
             </table>
 
             <div class="note">
-                <strong>Performance Tip - Direct Variable Access:</strong> For certain built-in variables like <code>position</code>, <code>rotation</code>, <code>linear_velocity</code>, and <code>angular_velocity</code>, you can read them directly by name without using <code>get_value()</code>. However, you MUST still use <code>set_value()</code> when modifying them so the game can detect and process the changes.
+                <strong>Performance Tip - Direct Variable Access:</strong> For certain built-in variables like
+                <code>position</code>, <code>rotation</code>, <code>linear_velocity</code>, and
+                <code>angular_velocity</code>, you can read them directly by name without using
+                <code>get_value()</code>. However, you MUST still use <code>set_value()</code> when modifying them so
+                the game can detect and process the changes.
                 <pre><code>-- Reading: Direct access is faster
 local pos = position  -- Instead of get_value("", name, "position")
 local vel = linear_velocity  -- Instead of get_value("", name, "linear_velocity")
@@ -799,7 +873,10 @@ set_value("", name, "linear_velocity", Vector2(50, 0))</code></pre>
             <p>Called every frame. Return modified inputs dictionary or nil.</p>
 
             <div class="warning">
-                <strong>Performance Warning:</strong> <code>_process</code> runs every frame and consumes significant processing power. Avoid calling expensive functions like <code>set_label</code>, <code>set_image</code>, or <code>set_progress_bar</code> inside <code>_process</code> unless values actually change. Cache previous values and only update UI when needed.
+                <strong>Performance Warning:</strong> <code>_process</code> runs every frame and consumes significant
+                processing power. Avoid calling expensive functions like <code>set_label</code>, <code>set_image</code>,
+                or <code>set_progress_bar</code> inside <code>_process</code> unless values actually change. Cache
+                previous values and only update UI when needed.
             </div>
 
             <pre><code>function _process(delta, inputs)
@@ -826,10 +903,16 @@ set_value("", name, "linear_velocity", Vector2(50, 0))</code></pre>
 end</code></pre>
 
             <h4>Input System and Gamepad Support</h4>
-            <p>The game comes with full gamepad integration and virtual mouse support. Players can use keyboard/mouse, Nintendo Switch controllers, Xbox controllers, or PlayStation controllers. The input mappings are automatically handled by the game.</p>
+            <p>The game comes with full gamepad integration and virtual mouse support. Players can use keyboard/mouse,
+                Nintendo Switch controllers, Xbox controllers, or PlayStation controllers. The input mappings are
+                automatically handled by the game.</p>
 
             <div class="note">
-                <strong>Modder-Friendly Input System:</strong> Players can customize their key bindings in the game settings. As a modder, you don't need to do anything special - just use the input names (<code>key_1</code> through <code>key_13</code>, <code>stick_1</code>, <code>stick_2</code>) and the game handles the rest. For detailed gamepad mappings, refer to <code>gamepad.ods</code> in the docs folder.
+                <strong>Modder-Friendly Input System:</strong> Players can customize their key bindings in the game
+                settings. As a modder, you don't need to do anything special - just use the input names
+                (<code>key_1</code> through <code>key_13</code>, <code>stick_1</code>, <code>stick_2</code>) and the
+                game handles the rest. For detailed gamepad mappings, refer to <code>gamepad.ods</code> in the docs
+                folder.
             </div>
 
             <table>
@@ -964,7 +1047,10 @@ end</code></pre>
             </table>
 
             <div class="note">
-                <strong>Note:</strong> Some inputs like ESC (Select, Back, Share button to open in-game menu), SPACE (Start, Menu, Options for UI selection), and R3 (virtual mouse click) are reserved for system use as default keybinds and cannot be listened to by modders. The game also features a virtual mouse system that allows gamepad users to interact with UI elements seamlessly.
+                <strong>Note:</strong> Some inputs like ESC (Select, Back, Share button to open in-game menu), SPACE
+                (Start, Menu, Options for UI selection), and R3 (virtual mouse click) are reserved for system use as
+                default keybinds and cannot be listened to by modders. The game also features a virtual mouse system
+                that allows gamepad users to interact with UI elements seamlessly.
             </div>
 
             <h4>_on_user_initialized(steam_id, nickname)</h4>
@@ -992,19 +1078,75 @@ end</code></pre>
     end
 end</code></pre>
 
-            <h4>_on_chat_message_received(sender_id, nickname, message)</h4>
-            <p>Called when a chat message is received. Return custom formatted string or nil for default.</p>
-            <pre><code>function _on_chat_message_received(sender_id, nickname, message)
-    -- Return nil: show default format
-    -- Return "": suppress message
-    -- Return string: show custom format (supports BBCode)
+            <h4>add_command(entity_name, function_name, command_name, description, chat_executable)</h4>
+            <p>Registers a command to the centralized command system. Commands are reset when the map is unloaded.
+                <b>Note:</b> Do not include the <code>/</code> prefix in the <code>command_name</code>; it is added
+                automatically for chat.
+            </p>
+            <ul>
+                <li><code>entity_name</code>: The name of the singleton or entity (e.g., <code>"-cmd"</code>).</li>
+                <li><code>function_name</code>: The function inside that entity to execute.</li>
+                <li><code>command_name</code>: The name of the command <b>without prefix</b> (e.g.,
+                    <code>"rules"</code>).
+                </li>
+                <li><code>description</code>: A brief description (shown in <code>/help</code>). If your command has
+                    parameters, describe them here (e.g. <code>"Teleport to [x] [y]"</code>).</li>
+                <li><code>chat_executable</code>: Boolean. If true, it can be executed via chat with a <code>/</code>
+                    prefix.</li>
+            </ul>
+            <div class="warning">
+                <strong>Important:</strong> <code>add_command</code> cannot execute network functions directly via
+                <code>run_network_function</code>. If you need to trigger network logic from a command, you must use a
+                local intermediate (wrapper) function as the callback, which then calls
+                <code>run_network_function</code>.
+            </div>
+            <pre><code>-- Typical usage (at top of script)
+add_command("-cmd", "show_rules", "rules", "Shows Finding Liar game rules", true)
+-- Users can now type '/rules' in chat or 'rules' in the console.
 
-    if message:match("^!command") then
-        -- Handle command
-        return ""  -- Suppress from chat
+-- Callback function example:
+function show_rules(sender_id, arg1, arg2)
+    -- arg1, arg2 etc. are strings passed from the chat/console
+    add_to_chat("Rules: Be nice!", false)
+end</code></pre>
+
+            <h4>_on_chat_message_received(sender_id, nickname, message)</h4>
+            <p>Called when a chat message is received. Supports <b>chaining</b> between multiple mods.</p>
+            <div class="note">
+                <strong>Automatic Command Interception:</strong> The system now checks for mod commands (registered via
+                <code>add_command</code>) <b>before</b> calling this function.
+                If a message matches a registered command, this handler will <b>not</b> be triggered for that message.
+            </div>
+            <div class="note">
+                <strong>Pre-formatted Message:</strong> The <code>message</code> argument is already formatted with the
+                player's nickname and color (e.g., <code>[color=#66FF99]username[/color]: actual message</code>).
+            </div>
+            <div class="note">
+                <strong>Chaining Logic:</strong>
+                <ul>
+                    <li><b>Return <code>nil</code>:</b> Mod performs no action. Passes the current message to the next
+                        mod.</li>
+                    <li><b>Return <code>""</code>:</b> Mod suppresses the message. The chain stops, and nothing is
+                        displayed.</li>
+                    <li><b>Return string:</b> Mod modifies the message. The new string is passed to the next mod.</li>
+                </ul>
+            </div>
+            <pre><code>function _on_chat_message_received(sender_id, nickname, message)
+    -- Example 1: Suppress messages from a specific user
+    if sender_id == "76561198..." then
+        return "" 
     end
 
-    return nil  -- Show normally
+    -- Example 2: Profanity Filter (Censorship)
+    -- Replaces "your mom" with "***" (case-insensitive)
+    local censored_message = message:gsub("[Yy][Oo][Uu][Rr] [Mm][Oo][Mm]", "***")
+
+    -- Example 3: Emoji Replacement
+    -- Replaces ":)" with a smiling face symbol
+    local final_message = censored_message:gsub(":%s?%)", "😊")
+
+    -- Example 4: Add a custom prefix
+    return "[GLOBAL] " .. final_message
 end</code></pre>
 
             <h4>_on_gamepad_connection_changed(has_gamepad)</h4>
@@ -1084,7 +1226,11 @@ if IS_HOST then
 end</code></pre>
 
             <h4>Important: User Entity Names Are Steam IDs</h4>
-            <p>In user scripts (user.lua), the <code>name</code> variable contains the player's Steam ID. This is why callbacks like <code>_on_user_initialized</code>, <code>_on_user_disconnected</code>, and <code>_on_user_banned</code> often check <code>if steam_id == name</code> - these callbacks run on ALL user entities, so you need to verify which user the event belongs to.</p>
+            <p>In user scripts (user.lua), the <code>name</code> variable contains the player's Steam ID. This is why
+                callbacks like <code>_on_user_initialized</code>, <code>_on_user_disconnected</code>, and
+                <code>_on_user_banned</code> often check <code>if steam_id == name</code> - these callbacks run on ALL
+                user entities, so you need to verify which user the event belongs to.
+            </p>
 
             <pre><code>-- These callbacks run on EVERY user entity
 function _on_user_disconnected(steam_id, nickname)
@@ -1102,7 +1248,8 @@ function _on_user_initialized(steam_id, nickname)
     end
 end</code></pre>
 
-            <p><strong>Targeting User Entities:</strong> When calling network functions on user entities, use the player's Steam ID as the entity name:</p>
+            <p><strong>Targeting User Entities:</strong> When calling network functions on user entities, use the
+                player's Steam ID as the entity name:</p>
             <pre><code>-- target_steam_id is a specific player's Steam ID
 run_network_function(target_steam_id, "change_team_ALL", {team_id})
 
@@ -1114,7 +1261,7 @@ run_network_function(name, "update_health_ALL", {new_health})</code></pre>
             <h4>create_panel(config)</h4>
             <p>Create a custom UI window/panel.</p>
             <pre><code>-- From Hook Up: inventory panel
-local panel = create_panel({
+local panel_name = create_panel({
     name = "_inventory_panel",
     title = "Inventory",
     text = "Your items:",
@@ -1424,12 +1571,21 @@ end</code></pre>
             <div class="warning">
                 <strong>Critical Rules:</strong>
                 <ul>
-                    <li><strong>Max Velocity:</strong> Entity velocity is capped at 300. Values above this are unnecessary.</li>
+                    <li><strong>Max Velocity:</strong> Entity velocity is capped at 300. Values above this are
+                        unnecessary.</li>
                     <li><strong>Z-Index Range:</strong> All z_index values must be between -999 and 999.</li>
-                    <li><strong>User Data Types in Tables:</strong> Vector2 and Color types CANNOT be used as table keys - you will get errors. Use strings or numbers as keys instead.</li>
-                    <li><strong>Local Variables:</strong> Variables declared with <code>local</code> keyword cannot be accessed with <code>get_value</code> or <code>set_value</code>. Only global entity variables can be accessed this way.</li>
-                    <li><strong>Return Values:</strong> <code>run_function</code> and <code>get_value</code> cannot return multiple values directly. To return multiple values, wrap them in a table.</li>
-                    <li><strong>Top Variables Must Be Primitive:</strong> Variables declared at the top of the script (before any function, comment, or blank line) must be primitive types (numbers, strings, booleans). Special configuration variables like <code>network_mode</code>, <code>singleton_name</code>, <code>area_radius</code>, etc. are parsed before script execution.</li>
+                    <li><strong>User Data Types in Tables:</strong> Vector2 and Color types CANNOT be used as table keys
+                        - you will get errors. Use strings or numbers as keys instead.</li>
+                    <li><strong>Local Variables:</strong> Variables declared with <code>local</code> keyword cannot be
+                        accessed with <code>get_value</code> or <code>set_value</code>. Only global entity variables can
+                        be accessed this way.</li>
+                    <li><strong>Return Values:</strong> <code>run_function</code> and <code>get_value</code> cannot
+                        return multiple values directly. To return multiple values, wrap them in a table.</li>
+                    <li><strong>Top Variables Must Be Primitive:</strong> Variables declared at the top of the script
+                        (before any function, comment, or blank line) must be primitive types (numbers, strings,
+                        booleans). Special configuration variables like <code>network_mode</code>,
+                        <code>singleton_name</code>, <code>area_radius</code>, etc. are parsed before script execution.
+                    </li>
                 </ul>
             </div>
 
@@ -1463,7 +1619,9 @@ local val = get_value("", name, "secret_value")  -- Works!</code></pre>
             <ul>
                 <li><strong>Minimize network calls:</strong> Batch updates instead of sending individual values</li>
                 <li><strong>Use local entities for effects:</strong> Particles and UI don't need to be synced</li>
-                <li><strong>Cache frequently accessed values:</strong> Store entity variables locally instead of calling <code>get_value</code> repeatedly</li>
+                <li><strong>Cache frequently accessed values:</strong> Store entity variables locally instead of calling
+                    <code>get_value</code> repeatedly
+                </li>
                 <li><strong>Use appropriate network modes:</strong> Static entities don't need continuous sync</li>
             </ul>
 
@@ -1540,11 +1698,15 @@ end</code></pre>
 
             <div class="highlight">
                 <h3>Additional Resources</h3>
-                <p>For complete API documentation, refer to <code>cenkers_mod_stub.lua</code> in your mod directory. This file contains detailed type annotations and parameter descriptions for all available functions.</p>
-                <p>Study the included example mods (Football, Hook Up, Campfire Survivors) to see these concepts in action!</p>
+                <p>For complete API documentation, refer to <code>cenkers_mod_stub.lua</code> in your mod directory.
+                    This file contains detailed type annotations and parameter descriptions for all available functions.
+                </p>
+                <p>Study the included example mods (Football, Hook Up, Campfire Survivors) to see these concepts in
+                    action!</p>
             </div>
 
-            <div style="margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border-color); text-align: center; color: var(--text-secondary);">
+            <div
+                style="margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border-color); text-align: center; color: var(--text-secondary);">
                 <p>For complete documentation, refer to cenkers_mod_stub.lua in your mod directory.</p>
             </div>
         </div>
@@ -1569,7 +1731,7 @@ end</code></pre>
         }
 
         // Load saved theme preference
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const savedTheme = localStorage.getItem('theme') || 'dark';
             const html = document.documentElement;
             const button = document.getElementById('themeToggle');
@@ -1598,4 +1760,5 @@ end</code></pre>
         });
     </script>
 </body>
+
 </html>
