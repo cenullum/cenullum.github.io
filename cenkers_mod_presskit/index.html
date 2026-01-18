@@ -1,3 +1,4 @@
+@ -1,540 +0,0 @@
 <!DOCTYPE html>
 <html lang="en">
 
@@ -273,12 +274,6 @@
             border: 2px dashed #666;
         }
 
-        .layout-grid {
-            display: grid;
-            grid-template-columns: 1fr 300px;
-            gap: 40px;
-        }
-
         @media (max-width: 768px) {
             .container {
                 padding: 10px;
@@ -298,19 +293,6 @@
                 display: block;
                 width: 100%;
             }
-
-            .layout-grid {
-                grid-template-columns: 1fr;
-                gap: 30px;
-            }
-
-            .theme-toggle {
-                top: 10px;
-            }
-
-            .social-link-text {
-                display: inline-block;
-            }
         }
     </style>
 </head>
@@ -319,7 +301,7 @@
     <div class="container">
         <div class="header">
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">☀️ Light Mode</button>
-            <img src="transparent.png" alt="Cenker's Mod" style="max-height: 300px; display: block; margin: 0 auto;">
+            <h1>Cenker's Mod</h1>
             <p style="font-size: 1.5em; margin-top: 10px; font-weight: bold;">Create, Host, Play</p>
             <a href="presskit.zip" class="download-btn" style="margin-top: 20px;">Download Press Kit (.zip)</a>
             <p style="margin-top: 10px; font-size: 0.8em; color: var(--text-secondary);">
@@ -330,7 +312,7 @@
         </div>
 
         <div class="content">
-            <div class="layout-grid">
+            <div style="display: grid; grid-template-columns: 1fr 300px; gap: 40px;">
                 <!-- Main Info Column -->
                 <div>
                     <h2>Pitch</h2>
@@ -417,8 +399,7 @@
                     <h2>Credits</h2>
                     <p><strong>Durmuş Cenker Cennet</strong><br>
                         Developer<br>
-                        <img src="asdf.svg" alt="Contact Email"
-                            style="margin-top: 8px; max-width: 100%; height: auto; display: block;">
+                        <a href="mailto:cenkercennet@gmail.com" class="contact-btn">Contact via Email</a>
                     </p>
 
                     <h2 style="margin-top: 30px;">Socials</h2>
