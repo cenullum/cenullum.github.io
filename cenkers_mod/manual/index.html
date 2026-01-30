@@ -373,11 +373,11 @@
             </div>
 
             <div class="note">
-                <strong>💾 Offline Access:</strong> Please download this manual from your browser (Save Page As)
+                <strong>Offline Access:</strong> Please download this manual from your browser (Save Page As)
                 to access it offline while modding.
             </div>
             <div class="note">
-                <strong>💡 LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in
+                <strong>LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in
                 every mod folder) contains detailed API type definitions and documentation comments for all available
                 functions. You can use this file with external editors that support <strong>luaLSP</strong> for features
                 like <strong>code suggestions</strong> and <strong>code completion</strong>, as there is currently
@@ -408,6 +408,7 @@
                     </li>
                     <li><a href="#examples">5. Practical Examples</a></li>
                     <li><a href="#best-practices">6. Best Practices</a></li>
+                    <li><a href="#uploading-workshop">7. Uploading To Steam Workshop</a></li>
                 </ul>
             </div>
 
@@ -1696,6 +1697,80 @@ if IS_HOST then
     add_to_chat("[DEBUG] Score updated: " .. score, false)
 end</code></pre>
 
+            <h2 id="uploading-workshop">7. Uploading To Steam Workshop</h2>
+            <p>Once your mod is ready, you can share it with the community by uploading it to the Steam Workshop. The
+                entire process is handled directly within the cenker's mod editor.</p>
+
+            <div class="note">
+                <strong>Note:</strong> To upload or update your mod, click the <strong>Submit</strong> button
+                located in the top right corner of the editor interface.
+            </div>
+
+            <h3>Setting Up Description and Icon</h3>
+            <p>The Workshop item automatically uses specific files from your mod directory:</p>
+            <ul>
+                <li><strong>icon.png</strong>: This will be the preview image seen on the Workshop.</li>
+                <li><strong>description.txt</strong>: The contents of this file will become the mod's Workshop
+                    description.</li>
+            </ul>
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="description.jpeg" alt="Mapping description and icon"
+                    style="max-width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
+                <p style="font-size: 0.9em; color: var(--text-secondary); margin-top: 8px;">Your local files are mapped
+                    to the Workshop UI automatically.</p>
+            </div>
+
+            <h3>Categories and Genres</h3>
+            <p>When you click Submit, you'll need to configure your mod's categorization:</p>
+            <ul>
+                <li><strong>Category</strong>: Choose between <strong>Mod</strong> (standalone experience) or
+                    <strong>Addon</strong> (extra content for other mods).
+                </li>
+                <li><strong>Genre/Type</strong>:
+                    <ul>
+                        <li>For <strong>Mods</strong>: Select the closest genre (Action, Strategy, Crafting, Sports,
+                            etc.).
+                        </li>
+                        <li>For <strong>Addons</strong>: Select the addon type. Addons are recommended to be compatible
+                            with other mods (e.g., new maps, moderation tools, or helper utilities).</li>
+                    </ul>
+                </li>
+            </ul>
+
+            <div class="warning">
+                <strong>Updating Your Mod:</strong> If you are updating an existing mod, you should select the same
+                <strong>Category</strong> and <strong>Genre</strong> as before. Don't forget to include your
+                <strong>Change Notes</strong> so users know what's new!
+            </div>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="changing_notes.jpeg" alt="Configuring change notes and categories"
+                    style="max-width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
+            </div>
+
+            <h3>The Upload Process</h3>
+            <p>During the upload, the game will communicate with Steam servers. A progress window will appear.</p>
+
+            <div class="warning">
+                <strong>Do Not Close:</strong> "cenker's mod" must remain open throughout the entire upload process.
+                Closing the game will interrupt the transfer.
+            </div>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="uploading.jpeg" alt="Upload in progress"
+                    style="max-width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
+            </div>
+
+            <h3>Finalizing</h3>
+            <p>Once successful, you'll receive a confirmation with your <strong>File ID</strong>. You can click
+                <strong>"View on Workshop"</strong> to see your live project and manage it through the Steam interface.
+            </p>
+
+            <div style="text-align: center; margin: 20px 0;">
+                <img src="done.jpeg" alt="Upload successful"
+                    style="max-width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
+            </div>
+
             <div class="highlight">
                 <h3>Additional Resources</h3>
                 <p>For complete API documentation, refer to <code>cenkers_mod_stub.lua</code> in your mod directory.
@@ -1705,10 +1780,7 @@ end</code></pre>
                     action!</p>
             </div>
 
-            <div
-                style="margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border-color); text-align: center; color: var(--text-secondary);">
-                <p>For complete documentation, refer to cenkers_mod_stub.lua in your mod directory.</p>
-            </div>
+
         </div>
     </div>
 
