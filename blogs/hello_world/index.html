@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,8 +16,9 @@
     <meta name="twitter:title" content="Hello World - Cenker Cennet">
     <meta name="twitter:description" content="My first blog post! About my game development journey and future plans.">
     <link rel="canonical" href="https://cenullum.com/blogs/hello_world/">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
-    
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+
     <style>
         * {
             margin: 0;
@@ -44,7 +46,15 @@
             overflow-x: hidden;
         }
 
-        h1, h2, h3, h4, h5, h6, .hero-title, .section-title, .card-title {
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        .hero-title,
+        .section-title,
+        .card-title {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         }
 
@@ -160,15 +170,16 @@
             width: 100%;
             max-width: 600px;
             height: auto;
-            border-radius: 8px;
+            border-radius: 4px;
             margin: 30px auto;
             display: block;
             box-shadow: var(--shadow);
+            border: 1px solid #ffffff;
         }
 
         .blog-content {
             background: var(--light-bg);
-            border-radius: 8px;
+            border-radius: 3px;
             padding: 40px;
             margin-bottom: 40px;
             box-shadow: var(--shadow);
@@ -274,13 +285,14 @@
         }
     </style>
 </head>
+
 <body>
     <header class="header">
         <div class="header-content">
             <a href="../../" class="home-link">
                 ← <span data-tr="Anasayfa" data-en="Home">Home</span>
             </a>
-            
+
             <div class="language-switcher">
                 <a href="#" class="lang-btn" data-lang="tr">TR</a>
                 <a href="#" class="lang-btn active" data-lang="en">EN</a>
@@ -311,10 +323,11 @@
             <p>Hello! This is my first blog post where I'll be sharing my game development journey with you.</p>
             <p>This is my cat image.</p>
             <img src="a.webp" alt="My cat" class="blog-image" style="width: 50%; height: auto;">
-            
+
             <p><strong>P.S.</strong> Don't forget to follow the RSS feed to stay updated with my latest posts!</p>
-            
-            <div style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--primary-color);">
+
+            <div
+                style="text-align: center; margin-top: 40px; padding-top: 20px; border-top: 1px solid var(--primary-color);">
                 <a href="../../rss.xml" class="rss-button">
                     <img src="../../rss_feed_logo.svg" alt="RSS" style="width: 16px; height: 16px;">
                     RSS Feed
@@ -325,7 +338,7 @@
 
     <script>
         // Language switching functionality
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const langButtons = document.querySelectorAll('.lang-btn');
             const langContents = document.querySelectorAll('[data-tr]');
 
@@ -334,7 +347,7 @@
             switchLanguage(savedLang);
 
             langButtons.forEach(button => {
-                button.addEventListener('click', function(e) {
+                button.addEventListener('click', function (e) {
                     e.preventDefault();
                     const selectedLang = this.getAttribute('data-lang');
                     switchLanguage(selectedLang);
@@ -364,4 +377,5 @@
         });
     </script>
 </body>
+
 </html>

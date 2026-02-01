@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -15,8 +16,9 @@
     <meta name="twitter:title" content="All Blog Posts - Cenker Cennet">
     <meta name="twitter:description" content="All blog posts by Cenker Cennet - Game Developer">
     <link rel="canonical" href="https://cenullum.com/blogs/">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
-    
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+
     <style>
         * {
             margin: 0;
@@ -44,7 +46,15 @@
             overflow-x: hidden;
         }
 
-        h1, h2, h3, h4, h5, h6, .hero-title, .section-title, .card-title {
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6,
+        .hero-title,
+        .section-title,
+        .card-title {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         }
 
@@ -144,7 +154,7 @@
 
         .blog-item {
             background: var(--light-bg);
-            border-radius: 8px;
+            border-radius: 3px;
             padding: 25px;
             border: 1px solid var(--primary-color);
             transition: all 0.3s ease;
@@ -221,7 +231,7 @@
             background: var(--primary-color);
             color: white;
             text-decoration: none;
-            border-radius: 4px;
+            border-radius: 3px;
             font-weight: 600;
             transition: all 0.3s ease;
             border: none;
@@ -279,14 +289,18 @@
         }
     </style>
 </head>
+
 <body>
     <header class="header">
         <div class="header-content">
             <a href="../" class="home-link">
                 ← <span data-tr="Anasayfa" data-en="Home">Home</span>
             </a>
-            
+
             <div class="language-switcher">
+                <a href="../donation/" class="lang-btn">
+                    <span data-tr="Bağış" data-en="Donation">Donation</span>
+                </a>
                 <a href="#" class="lang-btn" data-lang="tr">TR</a>
                 <a href="#" class="lang-btn active" data-lang="en">EN</a>
             </div>
@@ -307,7 +321,8 @@
                         <h3 class="blog-item-title">
                             <a href="./hello_world/">Hello World!</a>
                         </h3>
-                        <p class="blog-item-description">My first blog post! About my game development journey and future plans.</p>
+                        <p class="blog-item-description">My first blog post! About my game development journey and
+                            future plans.</p>
                         <div class="blog-item-meta">
                             <span class="blog-date">📅 2025-09-19</span>
                             <span class="blog-category">Personal</span>
@@ -337,7 +352,8 @@
                         <h3 class="blog-item-title">
                             <a href="./hello_world/">Hello World!</a>
                         </h3>
-                        <p class="blog-item-description">My first blog post! About my game development journey and future plans.</p>
+                        <p class="blog-item-description">My first blog post! About my game development journey and
+                            future plans.</p>
                         <div class="blog-item-meta">
                             <span class="blog-date">📅 2025-09-19</span>
                             <span class="blog-category">Personal</span>
@@ -357,7 +373,7 @@
 
     <script>
         // Language switching functionality
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             const langButtons = document.querySelectorAll('.lang-btn');
             const langContents = document.querySelectorAll('.lang-content');
 
@@ -366,7 +382,7 @@
             switchLanguage(savedLang);
 
             langButtons.forEach(button => {
-                button.addEventListener('click', function(e) {
+                button.addEventListener('click', function (e) {
                     e.preventDefault();
                     const selectedLang = this.getAttribute('data-lang');
                     switchLanguage(selectedLang);
@@ -397,4 +413,5 @@
         });
     </script>
 </body>
+
 </html>

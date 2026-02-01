@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bağış - Cenker Cennet</title>
+    <meta name="description" content="Cenker Cennet'e destek olun">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #6b7280;
+            --secondary-color: #4b5563;
+            --accent-color: #9ca3af;
+            --dark-bg: #050505;
+            --light-bg: #19191b;
+            --text-light: #fff;
+            --text-dark: #333;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            --gradient: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        body {
+            font-family: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-light);
+            background: var(--dark-bg);
+            overflow-x: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* Header - Roadmap Style */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: var(--light-bg);
+            z-index: 1000;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--primary-color);
+        }
+
+        .header-content {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .home-link {
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .home-link:hover {
+            color: var(--accent-color);
+        }
+
+        /* Language Switcher - Roadmap Style */
+        .language-switcher {
+            display: flex;
+            gap: 10px;
+        }
+
+        .lang-btn {
+            padding: 8px 12px;
+            background: var(--dark-bg);
+            border: 1px solid var(--primary-color);
+            border-radius: 4px;
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            font-size: 0.85rem;
+        }
+
+        .lang-btn:hover,
+        .lang-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: 80px;
+            padding: 40px 20px;
+            max-width: 800px;
+            margin-left: auto;
+            margin-right: auto;
+            flex-grow: 1;
+        }
+
+        .donation-card {
+            background: var(--light-bg);
+            border-radius: 3px;
+            padding: 40px;
+            text-align: center;
+            box-shadow: var(--shadow);
+            margin-bottom: 40px;
+        }
+
+        .title {
+            font-size: clamp(2rem, 5vw, 3rem);
+            font-weight: 700;
+            margin-bottom: 20px;
+            color: var(--text-light);
+        }
+
+        .description {
+            font-size: 1.1rem;
+            opacity: 0.8;
+            margin-bottom: 40px;
+        }
+
+        /* QR & Address */
+        .qr-section {
+            margin: 40px 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .qr-code {
+            max-width: 250px;
+            border-radius: 3px;
+            background: white;
+            padding: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .address-container {
+            background: var(--dark-bg);
+            padding: 15px;
+            border-radius: 3px;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            border: 1px solid var(--primary-color);
+            margin-bottom: 20px;
+        }
+
+        .address-text {
+            word-break: break-all;
+            font-family: monospace;
+            font-size: 0.85rem;
+            color: var(--accent-color);
+            text-align: left;
+        }
+
+        .btn-copy {
+            background: var(--primary-color);
+            color: var(--text-light);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+            white-space: nowrap;
+        }
+
+        .btn-copy:hover {
+            background: var(--secondary-color);
+            transform: translateY(-1px);
+        }
+
+        /* Information Section - Roadmap Style */
+        .section-group {
+            margin-top: 60px;
+        }
+
+        .section-header {
+            margin-bottom: 20px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid var(--primary-color);
+            text-align: left;
+        }
+
+        .section-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--accent-color);
+            margin: 0;
+        }
+
+        .section-description {
+            opacity: 0.8;
+            margin: 15px 0 25px;
+            text-align: left;
+            font-size: 0.95rem;
+        }
+
+        .tool-item {
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 3px;
+            background: var(--dark-bg);
+            border: 1px solid var(--primary-color);
+            transition: all 0.3s ease;
+            text-align: left;
+        }
+
+        .tool-item:hover {
+            background: var(--primary-color);
+            border-color: var(--accent-color);
+            transform: translateX(4px);
+            box-shadow: var(--shadow);
+        }
+
+        .tool-name {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--text-light);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .tool-desc {
+            font-size: 0.9rem;
+            opacity: 0.8;
+            margin-bottom: 15px;
+        }
+
+        .tool-link {
+            color: var(--accent-color);
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 0.85rem;
+            transition: color 0.3s;
+        }
+
+        .tool-item:hover .tool-link {
+            color: var(--text-light);
+        }
+
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .lang-content {
+            display: none;
+        }
+
+        .lang-content.active {
+            display: block;
+        }
+
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .main-content {
+                margin-top: 120px;
+                padding: 20px 15px;
+            }
+
+            .donation-card {
+                padding: 30px 20px;
+            }
+
+            .address-container {
+                flex-direction: column;
+            }
+
+            .btn-copy {
+                width: 100%;
+            }
+        }
+
+        .footer {
+            background: var(--light-bg);
+            padding: 40px 20px;
+            text-align: center;
+            border-top: 1px solid var(--primary-color);
+            margin-top: auto;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <a href="../" class="home-link">
+                ← <span class="lang-content" data-lang="tr">Anasayfa</span>
+                <span class="lang-content active" data-lang="en">Home</span>
+            </a>
+            <div class="language-switcher">
+                <a href="#" class="lang-btn" data-lang="tr">TR</a>
+                <a href="#" class="lang-btn active" data-lang="en">EN</a>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="donation-card">
+            <div class="lang-content" data-lang="tr">
+                <h1 class="title">Bana Destek Ol</h1>
+                <p class="description">
+                    Bağışlarınız oyun geliştirme süreçlerime ve günlük çalışmalarıma doğrudan destek sağlar. ☕ <br>
+                    Her türlü desteğiniz için şimdiden çok teşekkür ederim, bu benim için gerçekten çok önemli.
+                </p>
+            </div>
+            <div class="lang-content active" data-lang="en">
+                <h1 class="title">Support Me</h1>
+                <p class="description">
+                    Your donations directly support my game development process and daily work. ☕ <br>
+                    Thank you so much in advance for any support, it truly means a lot to me.
+                </p>
+            </div>
+
+            <div class="qr-section">
+                <div style="text-align: center; width: 100%; margin-bottom: 5px;">
+                    <span class="lang-content" data-lang="tr"
+                        style="font-size: 0.8rem; opacity: 0.7; font-weight: 600;">Monero QR Kodu</span>
+                    <span class="lang-content active" data-lang="en"
+                        style="font-size: 0.8rem; opacity: 0.7; font-weight: 600;">Monero QR Code</span>
+                </div>
+                <img src="qr_code.png" alt="Monero QR Code" class="qr-code">
+                <div style="text-align: left; width: 100%; margin-bottom: 5px;">
+                    <span class="lang-content" data-lang="tr"
+                        style="font-size: 0.8rem; opacity: 0.7; font-weight: 600;">Monero Adresim:</span>
+                    <span class="lang-content active" data-lang="en"
+                        style="font-size: 0.8rem; opacity: 0.7; font-weight: 600;">My Monero Address:</span>
+                </div>
+                <div class="address-container">
+                    <span class="address-text"
+                        id="xmr-address">8BStHwE12UdaTEztAdWwKm6bdxBy9HQDQdj9LJGTJnc4fBaCdtHAsKo1RLX9itpEFngY7nKvr2VZjVA8e7htJnAf8TgSsrK</span>
+                    <button class="btn-copy" onclick="copyAddress()">
+                        <span class="lang-content" data-lang="tr">Kopyala</span>
+                        <span class="lang-content active" data-lang="en">Copy</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="section-group">
+                <div class="lang-content" data-lang="tr">
+                    <div class="section-header">
+                        <h2 class="section-title">Monero Hakkında</h2>
+                    </div>
+                    <p class="section-description">
+                        Monero (XMR) gizliliğe odaklanan bir kripto paradır. Eğer elinizde Monero yoksa, aşağıdaki
+                        araçları kullanarak diğer kripto paralarınızı (Bitcoin, Ethereum, Solana vb.) kolayca Monero'ya
+                        dönüştürebilirsiniz.
+                    </p>
+                    <div class="tool-item">
+                        <div class="tool-name">Cake Wallet</div>
+                        <p class="tool-desc">Mobil ve desktop cüzdan. İçindeki dahili servislerle Bitcoin, Ethereum,
+                            Litecoin ve daha pek çok farklı kripto parayı saniyeler içinde Monero'ya
+                            dönüştürebilirsiniz.</p>
+                        <a href="https://cakewallet.com" target="_blank" class="tool-link">Web Sitesi &rarr;</a>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-name">Trocador</div>
+                        <p class="tool-desc">Gizlilik odaklı takas platformu. Eldeki nerdeyse tüm popüler kripto
+                            paraları (BTC, ETH, LTC, SOL vb.) en iyi fiyatlarla Monero ile takas etmenize olanak sağlar.
+                        </p>
+                        <a href="https://trocador.app" target="_blank" class="tool-link">Web Sitesi &rarr;</a>
+                    </div>
+                </div>
+
+                <div class="lang-content active" data-lang="en">
+                    <div class="section-header">
+                        <h2 class="section-title">About Monero</h2>
+                    </div>
+                    <p class="section-description">
+                        Monero (XMR) is a privacy-focused cryptocurrency. If you don't have Monero, you can easily
+                        exchange other cryptocurrencies (Bitcoin, Ethereum, Solana, etc.) for it using the tools below.
+                    </p>
+                    <div class="tool-item">
+                        <div class="tool-name">Cake Wallet</div>
+                        <p class="tool-desc">Mobile and desktop wallet. With built-in exchange services, you can swap
+                            Bitcoin, Ethereum, Litecoin, and many other cryptocurrencies for Monero in seconds.</p>
+                        <a href="https://cakewallet.com" target="_blank" class="info-link">Website &rarr;</a>
+                    </div>
+                    <div class="tool-item">
+                        <div class="tool-name">Trocador</div>
+                        <p class="tool-desc">Privacy-focused aggregator. It allows you to swap almost any popular
+                            cryptocurrency (BTC, ETH, LTC, SOL, etc.) for Monero at the best rates.</p>
+                        <a href="https://trocador.app" target="_blank" class="info-link">Website &rarr;</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="lang-content" data-lang="tr">
+            <p>&copy; 2025 Cenker Cennet. Tüm hakları saklıdır.</p>
+        </div>
+        <div class="lang-content active" data-lang="en">
+            <p>&copy; 2025 Cenker Cennet. All rights reserved.</p>
+        </div>
+    </footer>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const langButtons = document.querySelectorAll('.lang-btn');
+            const langContents = document.querySelectorAll('.lang-content');
+
+            const savedLang = localStorage.getItem('selectedLanguage') || 'en';
+            switchLanguage(savedLang);
+
+            langButtons.forEach(button => {
+                button.addEventListener('click', function (e) {
+                    e.preventDefault();
+                    const selectedLang = this.getAttribute('data-lang');
+                    switchLanguage(selectedLang);
+                    localStorage.setItem('selectedLanguage', selectedLang);
+                });
+            });
+
+            function switchLanguage(lang) {
+                langButtons.forEach(btn => {
+                    btn.classList.remove('active');
+                    if (btn.getAttribute('data-lang') === lang) btn.classList.add('active');
+                });
+
+                langContents.forEach(content => {
+                    content.classList.remove('active');
+                    if (content.getAttribute('data-lang') === lang) content.classList.add('active');
+                });
+
+                document.documentElement.lang = lang;
+            }
+        });
+
+        function copyAddress() {
+            const address = document.getElementById('xmr-address').innerText;
+            navigator.clipboard.writeText(address).then(() => {
+                const copyBtn = document.querySelector('.btn-copy');
+                const lang = document.documentElement.lang;
+                const originalContent = copyBtn.innerHTML;
+
+                const successMsg = lang === 'tr' ? 'Kopyalandı!' : 'Copied!';
+                copyBtn.innerText = successMsg;
+
+                setTimeout(() => {
+                    copyBtn.innerHTML = originalContent;
+                }, 2000);
+            });
+        }
+    </script>
+</body>
+
+</html>
