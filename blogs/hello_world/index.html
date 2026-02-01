@@ -294,6 +294,9 @@
             </a>
 
             <div class="language-switcher">
+                <a href="../../donation/" class="lang-btn">
+                    <span data-tr="Bağış" data-en="Donation">Donation</span>
+                </a>
                 <a href="#" class="lang-btn" data-lang="tr">TR</a>
                 <a href="#" class="lang-btn active" data-lang="en">EN</a>
             </div>
@@ -348,8 +351,10 @@
 
             langButtons.forEach(button => {
                 button.addEventListener('click', function (e) {
-                    e.preventDefault();
                     const selectedLang = this.getAttribute('data-lang');
+                    if (!selectedLang) return; // Allow normal link behavior for Donation button
+
+                    e.preventDefault();
                     switchLanguage(selectedLang);
                     localStorage.setItem('selectedLanguage', selectedLang);
                 });

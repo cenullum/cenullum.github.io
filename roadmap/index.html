@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Roadmap - Cenker Cennet</title>
     <meta name="description" content="Cenker Cennet - Development Roadmap">
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎮</text></svg>">
     <style>
         * {
             margin: 0;
@@ -32,8 +34,13 @@
             background: var(--dark-bg);
             overflow-x: hidden;
         }
-        
-        h1, h2, h3, h4, h5, h6 {
+
+        h1,
+        h2,
+        h3,
+        h4,
+        h5,
+        h6 {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
         }
 
@@ -81,7 +88,7 @@
             padding: 8px 12px;
             background: var(--dark-bg);
             border: 1px solid var(--primary-color);
-            border-radius: 4px;
+            border-radius: 3px;
             color: var(--text-light);
             text-decoration: none;
             font-weight: 600;
@@ -145,8 +152,13 @@
         }
 
         @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+            0% {
+                transform: rotate(0deg);
+            }
+
+            100% {
+                transform: rotate(360deg);
+            }
         }
 
         /* Roadmap List */
@@ -261,9 +273,9 @@
                 gap: 10px;
             }
         }
-
     </style>
 </head>
+
 <body>
     <!-- Header -->
     <header class="header">
@@ -271,8 +283,11 @@
             <a href="../" class="home-link">
                 ← <span data-tr="Anasayfa" data-en="Home">Home</span>
             </a>
-            
+
             <div class="language-switcher">
+                <a href="../donation/" class="lang-btn">
+                    <span data-tr="Bağış" data-en="Donation">Donation</span>
+                </a>
                 <a href="#" class="lang-btn" data-lang="tr">TR</a>
                 <a href="#" class="lang-btn active" data-lang="en">EN</a>
             </div>
@@ -303,7 +318,7 @@
         let currentLang = localStorage.getItem('selectedLanguage') || 'en';
 
         // Initialize page
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             initializeLanguage();
             loadRoadmapData();
         });
@@ -311,7 +326,7 @@
         // Language switching functionality
         function initializeLanguage() {
             const langButtons = document.querySelectorAll('.lang-btn');
-            
+
             // Set active language button
             langButtons.forEach(btn => {
                 btn.classList.remove('active');
@@ -322,16 +337,18 @@
 
             // Add event listeners
             langButtons.forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
+                button.addEventListener('click', function (e) {
                     const selectedLang = this.getAttribute('data-lang');
+                    if (!selectedLang) return; // Allow normal link behavior for Donation button
+
+                    e.preventDefault();
                     currentLang = selectedLang;
                     localStorage.setItem('selectedLanguage', selectedLang);
-                    
+
                     // Update buttons
                     langButtons.forEach(btn => btn.classList.remove('active'));
                     this.classList.add('active');
-                    
+
                     // Update content
                     updateLanguageContent();
                     if (roadmapData) {
@@ -378,7 +395,7 @@
             if (!roadmapData) return;
 
             const langData = roadmapData[currentLang];
-            
+
             // Hide loading, show content
             document.getElementById('loading').style.display = 'none';
             document.getElementById('pageHeader').style.display = 'block';
@@ -431,7 +448,7 @@
             itemDiv.className = 'roadmap-item';
 
             const hasLink = item.link && item.link.trim() !== '';
-            
+
             itemDiv.innerHTML = `
                 <div class="item-info">
                     <div class="item-title ${hasLink ? 'has-link' : ''}" ${hasLink ? `onclick="window.open('${item.link}', '_blank')"` : ''}>
@@ -444,4 +461,5 @@
         }
     </script>
 </body>
-</html> 
+
+</html>
