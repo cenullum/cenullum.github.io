@@ -757,8 +757,10 @@
 
             langButtons.forEach(button => {
                 button.addEventListener('click', function (e) {
-                    e.preventDefault();
                     const selectedLang = this.getAttribute('data-lang');
+                    if (!selectedLang) return; // Allow normal link behavior for Donation button
+
+                    e.preventDefault();
                     switchLanguage(selectedLang);
                     localStorage.setItem('selectedLanguage', selectedLang);
                 });
