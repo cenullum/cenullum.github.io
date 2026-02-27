@@ -148,6 +148,7 @@
             margin-bottom: 20px;
             color: var(--text-light);
             animation: fadeInUp 1s ease-out;
+            white-space: nowrap;
         }
 
         .hero-subtitle {
@@ -255,16 +256,6 @@
             height: 16px;
         }
 
-        .btn-outline {
-            background: transparent;
-            border: 2px solid var(--primary-color);
-            color: var(--primary-color);
-        }
-
-        .btn-outline:hover {
-            background: var(--primary-color);
-            color: white;
-        }
 
         /* Footer */
         .footer {
@@ -467,6 +458,88 @@
         .blog-item a:hover {
             text-decoration: none;
         }
+
+        /* Market Games Section Stylings */
+        .game-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 30px;
+            margin-top: 40px;
+        }
+
+        .game-card {
+            background: var(--light-bg);
+            border-radius: 8px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            border: 1px solid var(--primary-color);
+            transition: all 0.3s ease;
+            height: 100%;
+        }
+
+        .game-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+            border-color: var(--accent-color);
+        }
+
+        .game-image-container {
+            width: 100%;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .game-image-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .game-content {
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .game-title {
+            font-size: 1.8rem;
+            margin-bottom: 10px;
+            color: var(--text-light);
+        }
+
+        .game-description {
+            font-size: 1rem;
+            opacity: 0.8;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .game-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: auto;
+        }
+
+        .game-btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px 15px;
+            font-size: 0.9rem;
+            margin-top: 0;
+        }
+
+        @media (max-width: 992px) {
+            .game-grid {
+                grid-template-columns: 1fr;
+            }
+        }
     </style>
 </head>
 
@@ -502,6 +575,97 @@
             <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
                 <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" />
             </svg>
+        </div>
+    </section>
+
+    <!-- Games In Market Section -->
+    <section class="section">
+        <!-- Turkish Content -->
+        <div class="lang-content" data-lang="tr">
+            <h2 class="section-title">Marketlerdeki Oyunlarım</h2>
+            <div class="game-grid">
+                <!-- cenker's mod -->
+                <div class="game-card">
+                    <div class="game-image-container">
+                        <img src="./cenkersmod.webp" alt="cenker's mod">
+                    </div>
+                    <div class="game-content">
+                        <h3 class="game-title">cenker's mod</h3>
+                        <p class="game-description">Lua ile Modlanabilir Online Mini Oyun Paketi</p>
+                        <div class="game-buttons">
+                            <a href="https://store.steampowered.com/app/4185770/cenkers_mod/" target="_blank"
+                                class="btn game-btn">Steam Page</a>
+                            <a href="https://cenullum.com/cenkers_mod/presskit/" target="_blank"
+                                class="btn game-btn">PressKit</a>
+                            <a href="https://cenullum.com/cenkers_mod/manual/" target="_blank"
+                                class="btn game-btn">Manual</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Photo Jigsaw Puzzles -->
+                <div class="game-card">
+                    <div class="game-image-container">
+                        <img src="./MyPhotoJigsawPuzzles.webp" alt="My Photo Jigsaw Puzzles">
+                    </div>
+                    <div class="game-content">
+                        <h3 class="game-title">My Photo Jigsaw Puzzles</h3>
+                        <p class="game-description">Kendi kişisel yapbozunuzu oluşturun</p>
+                        <div class="game-buttons">
+                            <a href="https://play.google.com/store/apps/details?id=cenkercennet.jigsawpuzzle"
+                                target="_blank" class="btn game-btn">
+                                <img src="./play.svg" alt="Play Store"
+                                    style="width: 16px; height: 16px; margin-right: 8px; filter: brightness(0) invert(1);">
+                                Google Play
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- English Content -->
+        <div class="lang-content active" data-lang="en">
+            <h2 class="section-title">Games In Market</h2>
+            <div class="game-grid">
+                <!-- cenker's mod -->
+                <div class="game-card">
+                    <div class="game-image-container">
+                        <img src="./cenkersmod.webp" alt="cenker's mod">
+                    </div>
+                    <div class="game-content">
+                        <h3 class="game-title">cenker's mod</h3>
+                        <p class="game-description">Package of Online Mini Games Moddable with Lua</p>
+                        <div class="game-buttons">
+                            <a href="https://store.steampowered.com/app/4185770/cenkers_mod/" target="_blank"
+                                class="btn game-btn">Steam Page</a>
+                            <a href="https://cenullum.com/cenkers_mod/presskit/" target="_blank"
+                                class="btn game-btn">PressKit</a>
+                            <a href="https://cenullum.com/cenkers_mod/manual/" target="_blank"
+                                class="btn game-btn">Manual</a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- My Photo Jigsaw Puzzles -->
+                <div class="game-card">
+                    <div class="game-image-container">
+                        <img src="./MyPhotoJigsawPuzzles.webp" alt="My Photo Jigsaw Puzzles">
+                    </div>
+                    <div class="game-content">
+                        <h3 class="game-title">My Photo Jigsaw Puzzles</h3>
+                        <p class="game-description">Create your own personal jigsaw puzzle</p>
+                        <div class="game-buttons">
+                            <a href="https://play.google.com/store/apps/details?id=cenkercennet.jigsawpuzzle"
+                                target="_blank" class="btn game-btn">
+                                <img src="./play.svg" alt="Play Store"
+                                    style="width: 16px; height: 16px; margin-right: 8px; filter: brightness(0) invert(1);">
+                                Google Play
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -645,7 +809,7 @@
             </div>
             <div
                 style="text-align: center; margin-top: 30px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                <a href="./blogs/" class="btn btn-outline">
+                <a href="./blogs/" class="btn">
                     Tüm Blogları Gör
                 </a>
                 <a href="./rss.xml" class="btn">
@@ -675,7 +839,7 @@
             </div>
             <div
                 style="text-align: center; margin-top: 30px; display: flex; gap: 15px; justify-content: center; flex-wrap: wrap;">
-                <a href="./blogs/" class="btn btn-outline">
+                <a href="./blogs/" class="btn">
                     View All Blogs
                 </a>
                 <a href="./rss.xml" class="btn">
