@@ -14,7 +14,8 @@ const views = {
     featureConfig: document.getElementById('feature-config-view'),
     scoring: document.getElementById('scoring-view'),
     saveModal: document.getElementById('save-modal'),
-    smartCompare: document.getElementById('smart-compare-modal')
+    smartCompare: document.getElementById('smart-compare-modal'),
+    createList: document.getElementById('create-list-view')
 };
 
 // Navigation
@@ -38,14 +39,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initTheme();
 
     // Welcome View
-    document.getElementById('btn-create-new').addEventListener('click', () => {
-        if (appState.items.length > 0 && !confirm("Starting a new list will replace your current one. Continue?")) return;
-        appState = { listName: "My List", features: [], items: [], passwordHash: null };
-        document.getElementById('list-title-input').value = appState.listName;
-        showView('featureConfig'); // force user to setup features first
-    });
+    document.getElementById('btn-create-new').addEventListener('click', openCreateListModal);
 
-    document.getElementById('btn-load-example').addEventListener('click', loadExampleList);
+
+    document.getElementById('btn-load-example').addEventListener('click', () => {
+        if (appState.items.length > 0 || appState.features.length > 0) {
+            if (!confirm("Caution: This will override your current list and any unsaved changes will be lost. Do you want to continue?")) return;
+        }
+        loadExampleList();
+    });
 
     document.getElementById('file-upload').addEventListener('change', handleFileUpload);
     document.getElementById('btn-load-submit').addEventListener('click', handleFileDecrypt);
@@ -64,8 +66,17 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('search-input').addEventListener('input', renderDashboard);
     document.getElementById('btn-smart-compare').addEventListener('click', startSmartCompare);
 
+    // Create List View
+    document.getElementById('btn-close-create-list').addEventListener('click', () => showView('welcome'));
+    document.getElementById('btn-add-feature-new').addEventListener('click', addFeatureToNewList);
+    document.getElementById('new-list-feature-name').addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') addFeatureToNewList();
+    });
+    document.getElementById('btn-execute-create').addEventListener('click', executeCreateNewList);
+
     // Feature Config View
     document.getElementById('btn-close-feature-config').addEventListener('click', () => {
+
         if (appState.features.length === 0) {
             alert("Please add at least one scoring feature.");
             return;
@@ -121,7 +132,89 @@ function updateThemeIcon(theme) {
     btn.innerHTML = theme === 'dark' ? '<i class="fas fa-sun"></i>' : '<i class="fas fa-moon"></i>';
 }
 
-// --- Session & Example List Data ---
+// --- New List Creation Flow ---
+let tempNewListState = {
+    name: "My List",
+    features: []
+};
+
+function openCreateListModal() {
+    tempNewListState = {
+        name: "My List",
+        features: []
+    };
+    document.getElementById('new-list-name-input').value = tempNewListState.name;
+    renderNewListFeatures();
+    showView('createList');
+}
+
+function addFeatureToNewList() {
+    const input = document.getElementById('new-list-feature-name');
+    const name = input.value.trim();
+    if (!name) return;
+
+    if (tempNewListState.features.some(f => f.name.toLowerCase() === name.toLowerCase())) {
+        alert("This feature already exists.");
+        return;
+    }
+
+    tempNewListState.features.push({
+        id: 'feat_' + Date.now(),
+        name: name
+    });
+    input.value = '';
+    renderNewListFeatures();
+}
+
+function removeFeatureFromNewList(id) {
+    tempNewListState.features = tempNewListState.features.filter(f => f.id !== id);
+    renderNewListFeatures();
+}
+
+function renderNewListFeatures() {
+    const list = document.getElementById('new-list-features-list');
+    list.innerHTML = '';
+    tempNewListState.features.forEach(feat => {
+        const d = document.createElement('div');
+        d.className = 'form-group';
+        d.style.display = 'flex';
+        d.style.alignItems = 'center';
+        d.style.gap = '10px';
+        d.style.background = 'var(--tertiary-bg)';
+        d.style.padding = '8px 12px';
+        d.style.borderRadius = '5px';
+        d.style.marginBottom = '5px';
+
+        d.innerHTML = `
+            <div style="flex-grow:1; font-weight:600; font-size:0.9em;">${feat.name}</div>
+            <button class="btn-close" style="font-size:1em;" onclick="removeFeatureFromNewList('${feat.id}')"><i class="fas fa-times"></i></button>
+        `;
+        list.appendChild(d);
+    });
+}
+
+function executeCreateNewList() {
+    const name = document.getElementById('new-list-name-input').value.trim();
+    if (!name) {
+        alert("Please enter a name for your list.");
+        return;
+    }
+    if (tempNewListState.features.length === 0) {
+        alert("Please add at least one scoring feature (e.g., Graphics, Quality, etc.)");
+        return;
+    }
+
+    appState = {
+        listName: name,
+        features: [...tempNewListState.features],
+        items: [],
+        passwordHash: null
+    };
+
+    document.getElementById('list-title-input').value = appState.listName;
+    showView('dashboard');
+}
+
 function renderWelcomeSession() {
     const container = document.getElementById('active-list-card-container');
     if (appState && appState.items && (appState.items.length > 0 || appState.features.length > 0)) {

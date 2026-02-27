@@ -1,5 +1,8 @@
 User-agent: *
 Allow: /
 Disallow: /jigsaw_puzzle_minimalist_privacy_policy/
+Disallow: /cenkers_mod/privacy_policy/
+Disallow: /cenkers_mod/eula/
+Disallow: /eula/
 
 Sitemap: https://cenullum.com/sitemap.xml
