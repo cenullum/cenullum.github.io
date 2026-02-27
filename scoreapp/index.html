@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Score App - by Cenker</title>
+    <!-- FontAwesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- CryptoJS for secure JSON encryption/decryption -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="language-switcher">
+        <button id="themeToggle" class="lang-btn"><i class="fas fa-moon"></i></button>
+    </div>
+
+    <div class="container" id="app">
+
+        <!-- WELCOME / LOAD SCREEN -->
+        <div id="welcome-view" class="view active">
+            <div class="header">
+                <h1>Score App</h1>
+                <p>An app that helps you score any list. Keep your lists private by saving them as password-protected
+                    files on your computer.</p>
+            </div>
+
+            <div class="cards-grid" id="welcome-cards-grid">
+                <!-- Active List Card Placeholder -->
+                <div id="active-list-card-container" class="hidden" style="grid-column: 1 / -1;">
+                    <!-- Dynamic active list card will be injected here -->
+                </div>
+
+                <div class="card clickable" id="btn-create-new">
+                    <i class="fas fa-plus-circle card-icon"></i>
+                    <h3 class="card-title">Create New List</h3>
+                    <p class="card-description">Start a fresh list, add your items and define scoring features.</p>
+                </div>
+
+                <div class="card clickable" id="btn-load-example">
+                    <i class="fas fa-leaf card-icon"></i>
+                    <h3 class="card-title">Try Example List</h3>
+                    <p class="card-description">Load a pre-made list of Fruits & Vegetables to see how it works.</p>
+                </div>
+
+                <div class="card">
+                    <i class="fas fa-folder-open card-icon"></i>
+                    <h3 class="card-title">Load List</h3>
+                    <p class="card-description">Load an existing '.json' file and pick up where you left off.</p>
+                    <input type="file" id="file-upload" accept=".json" style="display: none;">
+                    <button class="btn" onclick="document.getElementById('file-upload').click()">
+                        Select File
+                    </button>
+                    <div id="password-prompt" class="hidden" style="margin-top: 15px;">
+                        <input type="password" id="load-password" placeholder="Enter password" class="input-field">
+                        <button class="btn" id="btn-load-submit">Load</button>
+                        <p id="load-error" class="error-msg"></p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- DASHBOARD VIEW -->
+        <div id="dashboard-view" class="view hidden">
+            <!-- Mobile friendly header flex -->
+            <div class="header dashboard-header">
+                <div class="dashboard-header-left">
+                    <button class="btn-outline btn-icon-only" id="btn-return-home" title="Return to Main Menu">
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
+                    <div class="list-title-container">
+                        <input type="text" id="list-title-input" class="input-field list-title-input" value="My List">
+                        <i class="fas fa-pen edit-icon"></i>
+                    </div>
+                </div>
+                <div class="dashboard-header-right">
+                    <button class="btn btn-outline" id="btn-edit-features" title="Manage Features">
+                        <i class="fas fa-sliders-h"></i> <span class="hide-mobile">Features</span>
+                    </button>
+                    <button class="btn" id="btn-smart-compare" title="Smart Comparison">
+                        <i class="fas fa-balance-scale"></i> <span class="hide-mobile">Compare</span>
+                    </button>
+                    <button class="btn" id="btn-save-list" title="Save List">
+                        <i class="fas fa-save"></i> <span class="hide-mobile">Save</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="filters-section" style="margin-bottom: 20px;">
+                <input type="text" id="search-input" placeholder="Search items or tags..." class="input-field"
+                    style="max-width: 300px;">
+                <div class="tags-filter" id="tags-filter-container">
+                    <!-- Tags will be injected here -->
+                </div>
+            </div>
+
+            <div class="cards-grid" id="items-grid">
+                <!-- Items will be generated here -->
+
+                <!-- Add New Item Card -->
+                <div class="card clickable item-card add-item-card" id="btn-add-item"
+                    style="justify-content: center; align-items: center; min-height: 250px;">
+                    <i class="fas fa-plus" style="font-size: 3em; color: var(--primary-color);"></i>
+                    <h3 class="card-title" style="margin-top: 15px;">Add New Item</h3>
+                </div>
+            </div>
+        </div>
+
+        <!-- ITEM EDITOR VIEW -->
+        <div id="item-editor-view" class="view hidden modal-overlay">
+            <div class="content modal-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Edit Item</h2>
+                    <button class="btn-close" id="btn-close-item-editor"><i class="fas fa-times"></i></button>
+                </div>
+
+                <input type="hidden" id="editor-item-id">
+
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input type="text" id="editor-item-name" class="input-field" placeholder="Enter item name">
+                </div>
+
+                <div class="form-group">
+                    <label>Main Image</label>
+                    <div class="image-drop-zone" id="item-image-drop-zone">
+                        <input type="file" id="item-image-input" accept="image/*" style="display: none;">
+                        <i class="fas fa-plus" style="font-size: 2em; margin-bottom: 10px;"></i>
+                        <p>Drag and drop or click to select image</p>
+                        <img id="item-image-preview" src="" style="display: none;">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Tags</label>
+
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 10px; align-items: center;">
+                        <select id="existing-tags-dropdown" class="input-field"
+                            style="flex: 1; min-width: 150px; cursor: pointer; margin-bottom: 0;">
+                            <option value="">Select existing tag...</option>
+                        </select>
+                        <span style="display: flex; align-items: center;">or</span>
+                        <div style="display: flex; flex: 2; min-width: 200px; gap: 5px;">
+                            <input type="text" id="new-tag-input" class="input-field" placeholder="New tag name"
+                                style="margin-bottom: 0;">
+                            <input type="color" id="new-tag-color" value="#478cbf"
+                                style="height: 40px; width: 40px; border: none; background: transparent; cursor: pointer;"
+                                title="Tag Color">
+                            <button class="btn" id="btn-add-tag" style="padding: 0 15px;">Add</button>
+                        </div>
+                    </div>
+                    <div class="tags-container" id="item-tags-container">
+                        <!-- Item tags go here -->
+                    </div>
+                </div>
+
+                <button class="btn" id="btn-save-item" style="width: 100%;"><i class="fas fa-check"></i> Save Item
+                    Changes</button>
+            </div>
+        </div>
+
+        <!-- FEATURE CONFIGURATION VIEW -->
+        <div id="feature-config-view" class="view hidden modal-overlay">
+            <div class="content modal-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Scoring Features</h2>
+                    <button class="btn-close" id="btn-close-feature-config"><i class="fas fa-times"></i></button>
+                </div>
+
+                <div id="features-list">
+                    <!-- Features injected here -->
+                </div>
+
+                <div class="feature-add-box form-group"
+                    style="padding: 15px; border: 1px dashed var(--primary-color); border-radius: 5px; margin-top: 20px;">
+                    <h4>Add New Feature</h4>
+                    <p style="font-size: 0.8em; opacity: 0.7; margin-bottom: 10px;">Features are categories you will
+                        score items against.</p>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="text" id="new-feature-name" class="input-field"
+                            placeholder="e.g., Graphics, Price, Taste" style="margin-bottom: 0;">
+                        <button class="btn" id="btn-add-feature"><i class="fas fa-plus"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SCORING VIEW (per item) -->
+        <div id="scoring-view" class="view hidden modal-overlay">
+            <div class="content modal-content" style="max-width: 800px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2 id="scoring-item-name">Evaluate Item</h2>
+                    <button class="btn-close" id="btn-close-scoring"><i class="fas fa-times"></i></button>
+                </div>
+
+                <div class="scoring-layout">
+                    <div class="scoring-item-info">
+                        <img id="scoring-item-image" class="full-width-image" src=""
+                            style="display: none; border-radius: 5px; margin-bottom: 15px; max-height: 250px; object-fit: cover;">
+                        <div id="scoring-item-tags" class="tags-container" style="margin-bottom: 15px;"></div>
+                        <div class="overall-score-display"
+                            style="font-size: 2em; text-align: center; padding: 20px; background: var(--tertiary-bg); border-radius: 5px;">
+                            Average: <span id="scoring-overall-average">0.0</span> <span
+                                style="font-size: 0.5em; opacity: 0.7;">/ 10</span>
+                        </div>
+                    </div>
+
+                    <div class="scoring-features-container" id="scoring-features-list"
+                        style="max-height: 400px; overflow-y: auto; padding-right: 10px;">
+                        <!-- Score sliders injected here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- SAVE MODAL -->
+        <div id="save-modal" class="view hidden modal-overlay">
+            <div class="content modal-content" style="max-width: 400px; text-align: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Save List securely</h2>
+                    <button class="btn-close" id="btn-close-save"><i class="fas fa-times"></i></button>
+                </div>
+                <p style="margin-bottom: 15px; font-size: 0.9em; opacity: 0.8;">Your list will be encrypted using the
+                    AES algorithm. <strong>If you forget this password, you cannot recover your data!</strong></p>
+
+                <input type="password" id="save-password" class="input-field" placeholder="Set a strong password">
+                <input type="text" id="save-filename" class="input-field" placeholder="Filename (e.g., my_list)"
+                    value="score_list" style="margin-top: 10px;">
+
+                <button class="btn" id="btn-execute-save" style="margin-top: 20px; width: 100%;">
+                    <i class="fas fa-lock"></i> Encrypt and Download
+                </button>
+            </div>
+        </div>
+
+        <!-- SMART COMPARE MODAL -->
+        <div id="smart-compare-modal" class="view hidden modal-overlay">
+            <div class="content modal-content" style="max-width: 800px; text-align: center;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>Smart Comparison</h2>
+                    <button class="btn-close" id="btn-close-smart-compare"><i class="fas fa-times"></i></button>
+                </div>
+
+                <div id="compare-setup-stage">
+                    <p>This mode compares your items feature by feature to find inconsistencies and helps you balance
+                        your scores by asking simple questions.</p>
+                    <button class="btn" id="btn-start-smart-compare"
+                        style="margin-top: 20px; font-size: 1.2em; padding: 15px 30px;">Start Comparison</button>
+                </div>
+
+                <div id="compare-active-stage" class="hidden">
+                    <h3 id="compare-feature-name" style="color: var(--accent-color); margin-bottom: 20px;">Feature: ...
+                    </h3>
+
+                    <h4 style="margin-bottom: 30px;">Which item executes this feature better?</h4>
+
+                    <div class="compare-cards-container">
+                        <div class="card clickable compare-card" id="compare-item-a">
+                            <img src="" class="compare-img hidden" id="compare-img-a">
+                            <h3 id="compare-name-a" style="margin-top: 15px;">Item A</h3>
+                            <p class="current-score-text hidden" id="p-score-a">Current Score: <span
+                                    id="compare-score-a"></span></p>
+                        </div>
+
+                        <div class="compare-vs">
+                            VS
+                        </div>
+
+                        <div class="card clickable compare-card" id="compare-item-b">
+                            <img src="" class="compare-img hidden" id="compare-img-b">
+                            <h3 id="compare-name-b" style="margin-top: 15px;">Item B</h3>
+                            <p class="current-score-text hidden" id="p-score-b">Current Score: <span
+                                    id="compare-score-b"></span></p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 30px;">
+                        <button class="btn btn-outline" id="btn-compare-skip">They are equal / Skip</button>
+                    </div>
+                </div>
+
+                <div id="compare-suggestion-stage" class="hidden" style="margin-top: 20px;">
+                    <div class="suggestion-box"
+                        style="padding: 20px; background: rgba(71, 140, 191, 0.1); border: 1px solid var(--accent-color); border-radius: 5px;">
+                        <h4>Suggestion detected</h4>
+                        <p id="compare-suggestion-text"></p>
+                        <div
+                            style="display: flex; gap: 10px; justify-content: center; margin-top: 15px; flex-wrap: wrap;">
+                            <button class="btn" id="btn-accept-suggestion">Accept Adjustment</button>
+                            <button class="btn btn-outline" id="btn-reject-suggestion">Decline</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="compare-done-stage" class="hidden">
+                    <i class="fas fa-check-circle"
+                        style="font-size: 4em; color: var(--accent-color); margin-bottom: 20px;"></i>
+                    <h3>All logical comparisons complete!</h3>
+                    <p>Your scores are internally consistent for now.</p>
+                    <button class="btn" id="btn-finish-compare" style="margin-top: 20px;"><i
+                            class="fas fa-arrow-left"></i> Return to List</button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
