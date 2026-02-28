@@ -242,8 +242,8 @@
 
                 <div class="scoring-layout">
                     <div class="scoring-item-info">
-                        <img id="scoring-item-image" class="full-width-image" src=""
-                            style="display: none; border-radius: 5px; margin-bottom: 15px; max-height: 250px; object-fit: cover;">
+                        <img id="scoring-item-image" class="full-width-image clickable-image" src=""
+                            style="display: none;">
                         <div id="scoring-item-tags" class="tags-container" style="margin-bottom: 15px;"></div>
                         <div class="overall-score-display"
                             style="font-size: 2em; text-align: center; padding: 20px; background: var(--tertiary-bg); border-radius: 5px;">
@@ -303,7 +303,7 @@
 
                     <div class="compare-cards-container">
                         <div class="card clickable compare-card" id="compare-item-a">
-                            <img src="" class="compare-img hidden" id="compare-img-a">
+                            <img src="" class="compare-img hidden clickable-image" id="compare-img-a">
                             <h3 id="compare-name-a" style="margin-top: 15px;">Item A</h3>
                             <p class="current-score-text hidden" id="p-score-a">Current Score: <span
                                     id="compare-score-a"></span></p>
@@ -314,7 +314,7 @@
                         </div>
 
                         <div class="card clickable compare-card" id="compare-item-b">
-                            <img src="" class="compare-img hidden" id="compare-img-b">
+                            <img src="" class="compare-img hidden clickable-image" id="compare-img-b">
                             <h3 id="compare-name-b" style="margin-top: 15px;">Item B</h3>
                             <p class="current-score-text hidden" id="p-score-b">Current Score: <span
                                     id="compare-score-b"></span></p>
@@ -350,6 +350,15 @@
             </div>
         </div>
 
+    </div>
+
+    <!-- FULLSCREEN IMAGE OVERLAY -->
+    <div id="fullscreen-overlay" class="fullscreen-overlay hidden">
+        <div class="fullscreen-bg"></div>
+        <button class="fullscreen-close"><i class="fas fa-times"></i></button>
+        <div class="fullscreen-content">
+            <img id="fullscreen-img" src="" alt="Fullscreen image">
+        </div>
     </div>
 
     <script src="app.js"></script>

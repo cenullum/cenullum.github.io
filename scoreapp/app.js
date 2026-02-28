@@ -15,7 +15,8 @@ const views = {
     scoring: document.getElementById('scoring-view'),
     saveModal: document.getElementById('save-modal'),
     smartCompare: document.getElementById('smart-compare-modal'),
-    createList: document.getElementById('create-list-view')
+    createList: document.getElementById('create-list-view'),
+    fullscreen: document.getElementById('fullscreen-overlay')
 };
 
 // Navigation
@@ -110,7 +111,30 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-close-smart-compare').addEventListener('click', () => showView('dashboard'));
     document.getElementById('btn-start-smart-compare').addEventListener('click', executeSmartCompareStep);
     document.getElementById('btn-finish-compare').addEventListener('click', () => showView('dashboard'));
+
+    // Fullscreen Overlay
+    document.getElementById('scoring-item-image').addEventListener('click', (e) => openFullscreenImage(e.target.src));
+    document.getElementById('compare-img-a').addEventListener('click', (e) => openFullscreenImage(e.target.src));
+    document.getElementById('compare-img-b').addEventListener('click', (e) => openFullscreenImage(e.target.src));
+
+    document.querySelector('.fullscreen-bg').addEventListener('click', closeFullscreenImage);
+    document.querySelector('.fullscreen-close').addEventListener('click', closeFullscreenImage);
 });
+
+function openFullscreenImage(src) {
+    if (!src) return;
+    const overlay = document.getElementById('fullscreen-overlay');
+    const img = document.getElementById('fullscreen-img');
+    img.src = src;
+    overlay.classList.remove('hidden');
+    document.body.style.overflow = 'hidden'; // Prevent scrolling
+}
+
+function closeFullscreenImage() {
+    const overlay = document.getElementById('fullscreen-overlay');
+    overlay.classList.add('hidden');
+    document.body.style.overflow = ''; // Restore scrolling
+}
 
 // --- Theme Management ---
 function initTheme() {
