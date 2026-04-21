@@ -373,11 +373,11 @@
             </div>
 
             <div class="note">
-                <strong>Offline Access:</strong> Please download this manual from your browser (Save Page As)
+                <strong>💾 Offline Access:</strong> Please download this manual from your browser (Save Page As)
                 to access it offline while modding.
             </div>
             <div class="note">
-                <strong>LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in
+                <strong>💡 LSP/Code Completion Support:</strong> The file <code>cenkers_mod_stub.lua</code> (included in
                 every mod folder) contains detailed API type definitions and documentation comments for all available
                 functions. You can use this file with external editors that support <strong>luaLSP</strong> for features
                 like <strong>code suggestions</strong> and <strong>code completion</strong>, as there is currently
@@ -413,7 +413,7 @@
             </div>
 
             <h2 id="introduction">1. Introduction</h2>
-            <p>cenker's mod is not a game engine. It is a package that has
+            <p><strong>Important:</strong> cenker's mod is not a game engine. It is a package that has
                 multiple multiplayer mods within it. Users can create and host their own mods using Lua 5.4 scripting.
                 cenker's mod handles networking, physics, rendering, and input management, allowing you to
                 focus on creating unique experiences.</p>
@@ -436,7 +436,7 @@
                 <li><strong>Lua 5.4 Scripting:</strong> Write game logic in Lua with full API access</li>
                 <li><strong>Entity System:</strong> Flexible entity-component architecture</li>
                 <li><strong>Network Synchronization:</strong> Automatic entity synchronization across clients</li>
-                <li><strong>Physics System:</strong> 2D physics for collisions and movement (max velocity: 300)</li>
+                <li><strong>Physics System:</strong> 2D physics for collisions and movement (max velocity: 600)</li>
                 <li><strong>UI Framework:</strong> Dynamic panel and widget creation system</li>
                 <li><strong>Audio System:</strong> 2D positional audio with effects</li>
                 <li><strong>Voice Chat:</strong> Integrated voice communication system</li>
@@ -527,7 +527,7 @@ set_collision({
             <div class="warning">
                 <strong>Important Physics Limitations:</strong>
                 <ul>
-                    <li>Maximum velocity for any entity is <strong>300</strong> (linear velocity magnitude is capped)
+                    <li>Maximum velocity for any entity is <strong>600</strong> (linear velocity magnitude is capped)
                     </li>
                     <li>Z-index values must be between <strong>-999</strong> and <strong>999</strong></li>
                 </ul>
@@ -552,6 +552,24 @@ set_collision({
                     <td>number</td>
                     <td>Movement speed multiplier</td>
                     <td>15</td>
+                </tr>
+                <tr>
+                    <td><code>jump_force</code></td>
+                    <td>number</td>
+                    <td>Jump impulse force (side-scroller only)</td>
+                    <td>500</td>
+                </tr>
+                <tr>
+                    <td><code>max_jump_count</code></td>
+                    <td>integer</td>
+                    <td>Total jumps allowed (negative = infinite,0 = disabled, 1 = single, 2 = double )</td>
+                    <td>2</td>
+                </tr>
+                <tr>
+                    <td><code>wall_jump_enabled</code></td>
+                    <td>boolean</td>
+                    <td>Enable jumping away from walls</td>
+                    <td>true</td>
                 </tr>
                 <tr>
                     <td><code>mass</code></td>
@@ -1572,7 +1590,7 @@ end</code></pre>
             <div class="warning">
                 <strong>Critical Rules:</strong>
                 <ul>
-                    <li><strong>Max Velocity:</strong> Entity velocity is capped at 300. Values above this are
+                    <li><strong>Max Velocity:</strong> Entity velocity is capped at 600. Values above this are
                         unnecessary.</li>
                     <li><strong>Z-Index Range:</strong> All z_index values must be between -999 and 999.</li>
                     <li><strong>User Data Types in Tables:</strong> Vector2 and Color types CANNOT be used as table keys
@@ -1697,6 +1715,7 @@ if IS_HOST then
     add_to_chat("[DEBUG] Score updated: " .. score, false)
 end</code></pre>
 
+
             <h2 id="uploading-workshop">7. Uploading To Steam Workshop</h2>
             <p>Once your mod is ready, you can share it with the community by uploading it to the Steam Workshop. The
                 entire process is handled directly within the cenker's mod editor.</p>
@@ -1780,7 +1799,10 @@ end</code></pre>
                     action!</p>
             </div>
 
-
+            <div
+                style="margin-top: 40px; padding-top: 20px; border-top: 2px solid var(--border-color); text-align: center; color: var(--text-secondary);">
+                <p>For complete documentation, refer to cenkers_mod_stub.lua in your mod directory.</p>
+            </div>
         </div>
     </div>
 
