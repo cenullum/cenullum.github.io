@@ -358,7 +358,7 @@
         <div class="header">
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">☀️ Light Mode</button>
             <h1>cenker's mod - Manual</h1>
-            <p style="font-size: 1.2em; margin-top: 10px;">Version 2.1.0</p>
+            <p style="font-size: 1.2em; margin-top: 10px;">Version 2.1.1</p>
             <p style="margin-top: 10px; color: var(--text-secondary);">A multiplayer game that hosts multiple mini-games
                 and enables community mod creation</p>
         </div>
@@ -684,26 +684,26 @@ run_function("-game_manager", "start_game", {})</code></pre>
                 <tr>
                     <th>Suffix</th>
                     <th>Who Can Call</th>
-                    <th>Where It Runs</th>
-                    <th>With Steam ID Parameter</th>
+                    <th>Where It Runs without Specific Steam ID</th>
+                    <th>Where It Runs with Specific Steam ID as last parameter</th>
                 </tr>
                 <tr>
                     <td><code>_HOST</code></td>
-                    <td>Host or Client</td>
+                    <td>Host or client</td>
                     <td>Host Only</td>
-                    <td>No effect</td>
+                    <td>Nothing happens</td>
                 </tr>
                 <tr>
                     <td><code>_ALL</code></td>
                     <td>Host Only</td>
                     <td>All Clients (Including Host)</td>
-                    <td>Runs only on host and specific client</td>
+                    <td>Function will only run on host and the specific user</td>
                 </tr>
                 <tr>
                     <td><code>_CLIENT</code></td>
                     <td>Host Only</td>
                     <td>All Clients (Excluding Host)</td>
-                    <td>Runs only on specific client</td>
+                    <td>Function will only run on specific user( specific user can be host itself)</td>
                 </tr>
             </table>
 
@@ -711,8 +711,10 @@ run_function("-game_manager", "start_game", {})</code></pre>
                 <strong>Critical Requirements for Network Functions:</strong>
                 <ul>
                     <li>Function name MUST end with <code>_HOST</code>, <code>_ALL</code>, or <code>_CLIENT</code></li>
-                    <li>First parameter MUST be named <code>sender_id</code> (the Steam ID of who called the function)
-                    </li>
+                    <li>First parameter MUST be named <code>sender_id</code> (or similar; it is a string representing
+                        the Steam ID of who wants to run the function)</li>
+                    <li>If <code>entity_name</code> is <code>"user"</code>, the function will work on each user entity
+                        once</li>
                     <li>Network functions without these suffixes will NOT work</li>
                 </ul>
                 <pre><code>function my_function_HOST(sender_id, other_params)
