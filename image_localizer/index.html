@@ -1,0 +1,3036 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Localizer</title>
+    <meta name="description" content="Offline, single-file tool to compose game UI images and generate localized versions for many languages.">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌐</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --primary-color: #6b7280;
+            --secondary-color: #4b5563;
+            --accent-color: #9ca3af;
+            --dark-bg: #050505;
+            --light-bg: #19191b;
+            --panel-bg: #121214;
+            --surface-2: #202024;
+            --surface-3: #2a2a2f;
+            --border: #2e2e33;
+            --text-light: #fff;
+            --text-dim: #9ca3af;
+            --text-mute: #6b7280;
+            --danger: #c0564b;
+            --warn: #d8a657;
+            --ok: #7faa6e;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.45);
+            --radius: 3px;
+            --head-font: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            --body-font: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
+        }
+
+        html, body { height: 100%; }
+        body {
+            font-family: var(--body-font);
+            color: var(--text-light);
+            background: var(--dark-bg);
+            overflow: hidden;
+            font-size: 13px;
+            line-height: 1.4;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        h1, h2, h3, h4 { font-family: var(--head-font); font-weight: 600; }
+
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--dark-bg); }
+        ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 6px; border: 2px solid var(--dark-bg); }
+        ::-webkit-scrollbar-thumb:hover { background: var(--primary-color); }
+
+        #app { display: flex; flex-direction: column; height: 100vh; }
+
+        /* ---------- Top toolbar ---------- */
+        .topbar {
+            display: flex; align-items: center; gap: 16px;
+            background: var(--panel-bg);
+            border-bottom: 1px solid var(--border);
+            padding: 6px 12px; flex-wrap: wrap;
+        }
+        .brand {
+            font-family: var(--head-font); font-weight: 700; font-size: 14px;
+            display: flex; align-items: center; gap: 8px; margin-right: 8px; white-space: nowrap;
+        }
+        .brand .logo { font-size: 18px; }
+        .tb-group { display: flex; align-items: center; gap: 6px; padding: 0 8px; border-right: 1px solid var(--border); }
+        .tb-group:last-child { border-right: none; }
+        .tb-group .lbl { color: var(--text-mute); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; margin-right: 4px; }
+
+        button, .btn {
+            font-family: var(--body-font); font-size: 12px;
+            background: var(--surface-2); color: var(--text-light);
+            border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 6px 10px; cursor: pointer; transition: all 0.15s ease;
+            display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+        }
+        button:hover, .btn:hover { background: var(--surface-3); border-color: var(--primary-color); }
+        button:active { transform: translateY(1px); }
+        button.primary { background: var(--primary-color); border-color: var(--primary-color); }
+        button.primary:hover { background: var(--secondary-color); }
+        button.danger:hover { background: var(--danger); border-color: var(--danger); }
+        button.icon { padding: 6px 8px; }
+        button.toggle.on { background: var(--primary-color); border-color: var(--primary-color); }
+        .tb-num { width: 50px; background: var(--surface-2); color: var(--text-light); border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 4px; font-size: 12px; -moz-appearance: textfield; }
+        .tb-num:focus { outline: none; border-color: var(--primary-color); }
+        button:disabled { opacity: .4; cursor: not-allowed; }
+        button:disabled:hover { background: var(--surface-2); border-color: var(--border); }
+        .sep { flex: 1; }
+
+        /* ---------- Workspace ---------- */
+        .workspace { flex: 1; display: flex; min-height: 0; }
+        .dock { background: var(--panel-bg); display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+        .left-dock { width: 280px; border-right: 1px solid var(--border); }
+        .right-dock { width: 320px; border-left: 1px solid var(--border); }
+        .resizer { width: 5px; cursor: col-resize; background: transparent; flex: 0 0 auto; }
+        .resizer:hover { background: var(--primary-color); }
+
+        .dock-tabs { display: flex; border-bottom: 1px solid var(--border); background: var(--dark-bg); }
+        .dock-tab {
+            flex: 1; text-align: center; padding: 8px 4px; font-size: 11px; cursor: pointer;
+            color: var(--text-dim); border-bottom: 2px solid transparent; text-transform: uppercase; letter-spacing: .04em;
+        }
+        .dock-tab.active { color: var(--text-light); border-bottom-color: var(--primary-color); background: var(--panel-bg); }
+        .dock-body { flex: 1; overflow-y: auto; min-height: 0; }
+        .dock-panel { display: none; flex-direction: column; height: 100%; }
+        .dock-panel.active { display: flex; }
+
+        .panel-head {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 8px 10px; border-bottom: 1px solid var(--border);
+            font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text-dim);
+            position: sticky; top: 0; background: var(--panel-bg); z-index: 2;
+        }
+        .panel-head .actions { display: flex; gap: 3px; }
+        .panel-head .actions button { padding: 3px 6px; font-size: 11px; }
+
+        /* ---------- Hierarchy / layers ---------- */
+        .layer-list { padding: 4px; display: flex; flex-direction: column; gap: 2px; }
+        .layer {
+            display: flex; align-items: center; gap: 6px; padding: 5px 6px; border-radius: var(--radius);
+            background: var(--surface-2); cursor: pointer; border: 1px solid transparent;
+        }
+        .layer:hover { background: var(--surface-3); }
+        .layer.selected { background: rgba(107,114,128,.35); border-color: var(--primary-color); }
+        .layer.dragover-top { box-shadow: inset 0 2px 0 var(--accent-color); }
+        .layer.dragover-bottom { box-shadow: inset 0 -2px 0 var(--accent-color); }
+        .layer .ico { width: 16px; text-align: center; opacity: .8; flex: 0 0 auto; }
+        .layer .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .layer .nm input { width: 100%; background: var(--dark-bg); border: 1px solid var(--primary-color); color: #fff; padding: 2px 4px; border-radius: 2px; font-size: 12px; }
+        .layer .vis, .layer .lock { opacity: .55; cursor: pointer; width: 18px; text-align: center; flex: 0 0 auto; }
+        .layer .vis:hover, .layer .lock:hover { opacity: 1; }
+        .layer .layer-del { opacity: 0; cursor: pointer; width: 18px; text-align: center; flex: 0 0 auto; font-size: 13px; transition: opacity .1s; }
+        .layer:hover .layer-del { opacity: .45; }
+        .layer:hover .layer-del:hover { opacity: 1; color: var(--danger); }
+        .layer.is-hidden { opacity: .45; }
+        .layer.is-hidden .nm { text-decoration: line-through; }
+        .layer.locked { opacity: .85; }
+        .layer .ico.thumb, .layer .ico.swatch { width: 22px; height: 22px; border-radius: 3px; overflow: hidden; opacity: 1; flex: 0 0 auto; }
+        .layer .ico.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .layer .ico.swatch { border: 1px solid var(--border); }
+        .layer .key-chip { flex: 0 0 auto; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-family: ui-monospace, 'DejaVu Sans Mono', monospace; color: var(--accent-color); background: var(--surface-3); border-radius: 8px; padding: 1px 6px; }
+        .empty-hint { padding: 16px; color: var(--text-mute); text-align: center; font-size: 12px; line-height: 1.6; }
+
+        /* ---------- Assets ---------- */
+        .asset-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 10px; }
+        .asset {
+            background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius);
+            padding: 6px; cursor: grab; text-align: center; position: relative; overflow: hidden;
+        }
+        .asset:hover { border-color: var(--primary-color); }
+        .asset .thumb { width: 100%; height: 70px; object-fit: contain; background:
+            conic-gradient(#1a1a1a 90deg, #161616 90deg 180deg, #1a1a1a 180deg 270deg, #161616 270deg) 0 0 / 16px 16px;
+            border-radius: 2px; display: block; }
+        .asset .nm { font-size: 10px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
+        .asset .del { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.6); border: none; border-radius: 2px; padding: 1px 5px; font-size: 11px; opacity: 0; }
+        .asset:hover .del { opacity: 1; }
+        .dropzone { margin: 10px; border: 1.5px dashed var(--border); border-radius: var(--radius); padding: 16px; text-align: center; color: var(--text-mute); font-size: 12px; cursor: pointer; }
+        .dropzone:hover, .dropzone.over { border-color: var(--primary-color); color: var(--text-light); background: var(--surface-2); }
+
+        /* ---------- Center / canvas ---------- */
+        .center { flex: 1; display: flex; flex-direction: column; min-width: 0; background: var(--dark-bg); }
+        .page-tabs { display: flex; align-items: center; gap: 2px; padding: 6px 8px 0; background: var(--panel-bg); border-bottom: 1px solid var(--border); overflow-x: auto; }
+        .page-tab {
+            display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; white-space: nowrap;
+            background: var(--surface-2); border: 1px solid var(--border); border-bottom: none;
+            border-radius: var(--radius) var(--radius) 0 0; color: var(--text-dim); font-size: 12px;
+        }
+        .page-tab.active { background: var(--dark-bg); color: var(--text-light); border-color: var(--primary-color); border-bottom: 1px solid var(--dark-bg); margin-bottom: -1px; }
+        .page-tab .pt-name[contenteditable] { outline: none; }
+        .page-tab .pt-close { opacity: .5; padding: 0 2px; border-radius: 2px; }
+        .page-tab .pt-close:hover { opacity: 1; color: var(--danger); }
+        .page-add { padding: 7px 10px; cursor: pointer; color: var(--text-dim); background: transparent; border: none; }
+        .page-add:hover { color: #fff; background: transparent; }
+
+        .lang-bar { display: flex; align-items: center; gap: 10px; padding: 6px 10px; background: var(--panel-bg); border-bottom: 1px solid var(--border); }
+        .lang-bar select { min-width: 130px; }
+        .lang-bar .warn-pill { color: var(--warn); font-size: 11px; display: none; align-items: center; gap: 5px; }
+        .lang-bar .warn-pill.show { display: inline-flex; }
+
+        .canvas-wrap { flex: 1; position: relative; overflow: hidden; min-height: 0;
+            background:
+              linear-gradient(45deg, #0b0b0c 25%, transparent 25%),
+              linear-gradient(-45deg, #0b0b0c 25%, transparent 25%),
+              linear-gradient(45deg, transparent 75%, #0b0b0c 75%),
+              linear-gradient(-45deg, transparent 75%, #0b0b0c 75%);
+            background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0px; background-color: #080809;
+        }
+        .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+        .stage canvas { display: block; box-shadow: 0 0 0 1px var(--border), var(--shadow-lg); image-rendering: auto; }
+        .overlay { position: absolute; inset: 0; pointer-events: none; }
+        .sel-box { position: absolute; border: 1px solid var(--accent-color); pointer-events: none; box-sizing: border-box; }
+        .sel-box.warn { border-color: var(--warn); }
+        .safe-box { position: absolute; border: 1px dashed rgba(156,163,175,.5); pointer-events: none; box-sizing: border-box; }
+        .handle { position: absolute; background: var(--text-light); border: 1px solid var(--primary-color); width: 10px; height: 10px; pointer-events: all; box-sizing: border-box; }
+        .handle.rot { border-radius: 50%; background: var(--accent-color); cursor: grab; }
+        .handle.nw, .handle.se { cursor: nwse-resize; }
+        .handle.ne, .handle.sw { cursor: nesw-resize; }
+        .handle.n, .handle.s { cursor: ns-resize; }
+        .handle.e, .handle.w { cursor: ew-resize; }
+        .rot-line { position: absolute; width: 1px; background: var(--accent-color); pointer-events: none; }
+        .marquee { position: absolute; border: 1px solid var(--accent-color); background: rgba(156,163,175,.12); pointer-events: none; }
+
+        .canvas-ctrl { position: absolute; bottom: 10px; left: 10px; display: flex; gap: 4px; z-index: 5; }
+        .canvas-ctrl-r { position: absolute; bottom: 10px; right: 10px; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; z-index: 5; }
+        .canvas-ctrl-r .zoom-row { display: flex; align-items: center; gap: 4px; }
+        .canvas-ctrl button, .canvas-ctrl-r button, .canvas-ctrl-r .zoom-lbl {
+            padding: 5px 9px; font-size: 13px;
+            background: rgba(18,18,20,.82); backdrop-filter: blur(4px); border-color: var(--border);
+        }
+        .canvas-ctrl-r .zoom-lbl { min-width: 46px; text-align: center; font-size: 12px; color: var(--text-dim); border: 1px solid var(--border); border-radius: var(--radius); }
+        .statusbar { display: flex; align-items: center; gap: 14px; padding: 4px 10px; background: var(--panel-bg); border-top: 1px solid var(--border); font-size: 11px; color: var(--text-dim); }
+        .statusbar .sb-item { display: flex; align-items: center; gap: 5px; }
+        .statusbar .sep { flex: 1; }
+
+        /* ---------- Inspector ---------- */
+        .inspector { padding: 0 0 30px; }
+        .insp-group { border-bottom: 1px solid var(--border); }
+        .insp-group > .gh { display: flex; align-items: center; gap: 6px; padding: 7px 10px; cursor: pointer; font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--text-dim); background: var(--dark-bg); }
+        .insp-group > .gh:hover { color: #fff; }
+        .insp-group > .gh .chev { transition: transform .15s; }
+        .insp-group.collapsed > .gh .chev { transform: rotate(-90deg); }
+        .insp-group.collapsed > .gc { display: none; }
+        .gc { padding: 8px 10px; display: flex; flex-direction: column; gap: 8px; }
+        .row { display: flex; align-items: center; gap: 8px; }
+        .row > label { flex: 0 0 84px; color: var(--text-dim); font-size: 11px; }
+        .row .ctl { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
+        .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .field { display: flex; flex-direction: column; gap: 3px; }
+        .field > label { color: var(--text-mute); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
+
+        input[type=text], input[type=number], select, textarea {
+            font-family: var(--body-font); font-size: 12px; width: 100%;
+            background: var(--dark-bg); color: var(--text-light);
+            border: 1px solid var(--border); border-radius: var(--radius); padding: 5px 7px;
+        }
+        input:focus, select:focus, textarea:focus { outline: none; border-color: var(--primary-color); }
+        textarea { resize: vertical; min-height: 48px; }
+        input[type=range] { width: 100%; accent-color: var(--primary-color); }
+        input[type=color] { width: 34px; height: 28px; padding: 2px; background: var(--dark-bg); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; flex: 0 0 auto; }
+        input[type=checkbox] { width: 15px; height: 15px; accent-color: var(--primary-color); cursor: pointer; }
+        .seg { display: flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+        .seg button { border: none; border-radius: 0; flex: 1; padding: 5px; background: var(--dark-bg); }
+        .seg button.on { background: var(--primary-color); }
+        .num-unit { position: relative; flex: 1; }
+        .insp-empty { padding: 30px 16px; text-align: center; color: var(--text-mute); line-height: 1.7; }
+        .mini { font-size: 10px; color: var(--text-mute); }
+        .val-badge { font-size: 10px; color: var(--text-dim); min-width: 30px; text-align: right; }
+
+        /* ---------- Modal ---------- */
+        .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 100; }
+        .modal-back.open { display: flex; }
+        .modal {
+            background: var(--panel-bg); border: 1px solid var(--border); border-radius: var(--radius);
+            box-shadow: var(--shadow-lg); width: 760px; max-width: 94vw; max-height: 90vh; display: flex; flex-direction: column;
+        }
+        .modal.sm { width: 440px; }
+        .modal.lg { width: 920px; }
+        .modal-head { display: flex; align-items: center; justify-content: space-between; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+        .modal-head h3 { font-size: 15px; }
+        .modal-body { padding: 16px; overflow-y: auto; min-height: 0; }
+        .modal-foot { padding: 12px 16px; border-top: 1px solid var(--border); display: flex; gap: 8px; justify-content: flex-end; }
+        .x-close { cursor: pointer; padding: 4px 8px; background: transparent; border: none; font-size: 16px; color: var(--text-dim); }
+        .x-close:hover { color: #fff; background: transparent; }
+
+        table.data { width: 100%; border-collapse: collapse; font-size: 12px; }
+        table.data th, table.data td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--border); }
+        table.data th { color: var(--text-dim); font-weight: 600; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; }
+        table.data tr:hover td { background: var(--surface-2); }
+        .tag { display: inline-block; background: var(--surface-3); border-radius: 10px; padding: 1px 8px; font-size: 10px; margin: 1px; }
+        .lang-edit { width: 84px; background: var(--dark-bg); color: var(--text-light); border: 1px solid var(--primary-color); border-radius: var(--radius); padding: 3px 6px; font-size: 12px; font-family: ui-monospace, 'DejaVu Sans Mono', monospace; }
+        .lang-edit:focus { outline: none; border-color: var(--accent-color); }
+        /* Google Fonts browser */
+        .gf-list { max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--dark-bg); }
+        .gf-row { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+        .gf-row:last-child { border-bottom: none; }
+        .gf-meta { flex: 1; display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+        .gf-fam { font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .gf-cat { font-size: 10px; color: var(--text-dim); text-transform: capitalize; }
+        .gf-w { width: 74px; flex: 0 0 auto; background: var(--surface-2); color: var(--text-light); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px; font-size: 12px; }
+        .help { font-size: 11px; color: var(--text-mute); line-height: 1.6; }
+        .help code { background: var(--surface-2); padding: 1px 4px; border-radius: 2px; color: var(--accent-color); }
+
+        .radio-card { display: flex; gap: 8px; }
+        .radio-card label { flex: 1; border: 1px solid var(--border); border-radius: var(--radius); padding: 10px; cursor: pointer; display: flex; flex-direction: column; gap: 4px; background: var(--surface-2); }
+        .radio-card label:hover { border-color: var(--primary-color); }
+        .radio-card input { display: none; }
+        .radio-card input:checked + .rc-body { color: #fff; }
+        .radio-card label:has(input:checked) { border-color: var(--primary-color); background: rgba(107,114,128,.25); }
+        .rc-title { font-weight: 600; }
+        .rc-desc { font-size: 10px; color: var(--text-mute); }
+        .lang-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+        .lang-pick label { display: inline-flex; align-items: center; gap: 5px; background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: 4px 8px; cursor: pointer; }
+        .lang-pick label:has(input:checked) { border-color: var(--primary-color); background: rgba(107,114,128,.25); }
+
+        /* ---------- Toast ---------- */
+        #toasts { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 200; display: flex; flex-direction: column; gap: 8px; align-items: center; }
+        .toast { background: var(--surface-3); border: 1px solid var(--border); border-left: 3px solid var(--primary-color); border-radius: var(--radius); padding: 9px 14px; box-shadow: var(--shadow-lg); font-size: 12px; max-width: 420px; animation: tin .2s ease; }
+        .toast.warn { border-left-color: var(--warn); }
+        .toast.err { border-left-color: var(--danger); }
+        .toast.ok { border-left-color: var(--ok); }
+        @keyframes tin { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+        .progress { height: 6px; background: var(--surface-2); border-radius: 3px; overflow: hidden; margin-top: 8px; }
+        .progress > div { height: 100%; background: var(--primary-color); width: 0; transition: width .1s; }
+        .kbd { font-family: monospace; background: var(--surface-2); border: 1px solid var(--border); border-radius: 3px; padding: 0 5px; font-size: 11px; }
+        .hidden { display: none !important; }
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <!-- TOOLBAR -->
+        <div class="topbar">
+            <div class="brand"><span class="logo">🌐</span><span>Image Localizer</span></div>
+            <div class="tb-group">
+                <button id="btn-new" title="New project">New</button>
+                <button id="btn-open" title="Open project (.licproj)">Open</button>
+                <button id="btn-save" title="Save project">Save</button>
+            </div>
+            <div class="tb-group">
+                <button id="btn-add-text" title="Add text">+ Text</button>
+                <button id="btn-add-image" title="Add image">+ Image</button>
+                <button id="btn-add-rect" title="Add rectangle">+ Rect</button>
+            </div>
+            <div class="tb-group">
+                <button id="btn-grid" class="toggle icon" title="Toggle grid">#</button>
+                <button id="btn-snap" class="toggle icon" title="Toggle snap to grid">⊹</button>
+                <input id="grid-size" class="tb-num" type="number" min="2" max="512" step="1" value="20" title="Grid / snap cell size (px)" />
+            </div>
+            <div class="sep"></div>
+            <div class="tb-group">
+                <button id="btn-loc" title="Localization Manager">🌍 Localization</button>
+                <button id="btn-fonts" title="Font Manager">🅵 Fonts</button>
+            </div>
+            <div class="tb-group">
+                <button id="btn-export" class="primary" title="Export images">⬇ Export</button>
+            </div>
+        </div>
+
+        <!-- WORKSPACE -->
+        <div class="workspace">
+            <!-- LEFT DOCK -->
+            <div class="dock left-dock" id="left-dock">
+                <div class="dock-tabs">
+                    <div class="dock-tab active" data-dock="layers">Layers</div>
+                    <div class="dock-tab" data-dock="assets">Assets</div>
+                </div>
+                <div class="dock-body">
+                    <div class="dock-panel active" id="panel-layers">
+                        <div class="panel-head">
+                            <div class="actions">
+                                <button id="lyr-up" title="Move up">▲</button>
+                                <button id="lyr-down" title="Move down">▼</button>
+                                <button id="lyr-dup" title="Duplicate (Ctrl+D)">⧉</button>
+                            </div>
+                        </div>
+                        <div class="layer-list" id="layer-list"></div>
+                    </div>
+                    <div class="dock-panel" id="panel-assets">
+                        <div class="panel-head">
+                            <div class="actions"><button id="asset-import">Import</button></div>
+                        </div>
+                        <div class="dropzone" id="asset-drop">Drop images here or click to import<br><span class="mini">PNG · JPG · WebP · SVG</span></div>
+                        <div class="asset-grid" id="asset-grid"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="resizer" id="resize-left"></div>
+
+            <!-- CENTER -->
+            <div class="center">
+                <div class="page-tabs" id="page-tabs"></div>
+                <div class="lang-bar">
+                    <span class="lbl" style="color:var(--text-mute);font-size:11px">Preview language</span>
+                    <select id="preview-lang"><option value="__key">— Show keys —</option></select>
+                    <button id="btn-page-res" title="Edit page resolution">⛶ <span id="res-label">1920×1080</span></button>
+                    <span class="warn-pill" id="fit-warn">⚠ <span id="fit-warn-text">0 overflow</span></span>
+                    <div class="sep" style="flex:1"></div>
+                    <span class="mini" id="bg-wrap">BG <input type="color" id="page-bg" value="#1e1e22" style="vertical-align:middle"> <label style="color:var(--text-mute)"><input type="checkbox" id="page-bg-on"> fill</label></span>
+                </div>
+                <div class="canvas-wrap" id="canvas-wrap">
+                    <div class="stage" id="stage">
+                        <canvas id="view"></canvas>
+                    </div>
+                    <div class="overlay" id="overlay"></div>
+                    <div class="canvas-ctrl">
+                        <button id="btn-undo" class="icon" title="Undo (Ctrl+Z)">↶</button>
+                        <button id="btn-redo" class="icon" title="Redo (Ctrl+Y)">↷</button>
+                    </div>
+                    <div class="canvas-ctrl-r">
+                        <button id="btn-zoom-fit" title="Fit canvas to screen">Fit</button>
+                        <div class="zoom-row">
+                            <button id="btn-zoom-out" class="icon" title="Zoom out">−</button>
+                            <span id="zoom-label" class="zoom-lbl">100%</span>
+                            <button id="btn-zoom-in" class="icon" title="Zoom in">+</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="statusbar">
+                    <span class="sb-item" id="sb-sel">No selection</span>
+                    <span class="sb-item" id="sb-pos"></span>
+                    <span class="sep"></span>
+                    <span class="sb-item" id="sb-proj">Untitled</span>
+                    <span class="sb-item" id="sb-auto" style="color:var(--text-mute)"></span>
+                </div>
+            </div>
+            <div class="resizer" id="resize-right"></div>
+
+            <!-- RIGHT DOCK / INSPECTOR -->
+            <div class="dock right-dock" id="right-dock">
+                <div class="panel-head"><span id="insp-title">Inspector</span></div>
+                <div class="dock-body"><div class="inspector" id="inspector"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODALS -->
+    <div class="modal-back" id="modal-loc"></div>
+    <div class="modal-back" id="modal-font"></div>
+    <div class="modal-back" id="modal-export"></div>
+    <div class="modal-back" id="modal-generic"></div>
+
+    <!-- hidden inputs -->
+    <input type="file" id="file-project" accept=".licproj,.json,application/json" class="hidden">
+    <input type="file" id="file-assets" accept="image/*" multiple class="hidden">
+    <input type="file" id="file-fonts" accept=".ttf,.otf,font/ttf,font/otf" multiple class="hidden">
+    <input type="file" id="file-loc" accept=".json,.csv,application/json,text/csv" multiple class="hidden">
+
+    <div id="toasts"></div>
+
+    <script>
+'use strict';
+
+/* =========================================================================
+   Localization Image Composer — single-file editor.
+   Sections: utils · zip · model · history · localization · fonts ·
+             render · canvas-view · selection · hierarchy · inspector ·
+             assets · loc-manager · font-manager · export · project · init
+   ========================================================================= */
+
+/* ---------------------------- Utilities -------------------------------- */
+const $ = (sel, root = document) => root.querySelector(sel);
+const $$ = (sel, root = document) => Array.from(root.querySelectorAll(sel));
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+const uid = (p = 'id') => p + '_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-3);
+const deepClone = (o) => (typeof structuredClone === 'function' ? structuredClone(o) : JSON.parse(JSON.stringify(o)));
+const round = (n, d = 2) => { const m = 10 ** d; return Math.round(n * m) / m; };
+const escapeHtml = (s) => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+function el(tag, attrs = {}, ...kids) {
+    const n = document.createElement(tag);
+    for (const k in attrs) {
+        const v = attrs[k];
+        if (k === 'class') n.className = v;
+        else if (k === 'style') n.style.cssText = v;
+        else if (k === 'html') n.innerHTML = v;
+        else if (k === 'text') n.textContent = v;
+        else if (k.startsWith('on') && typeof v === 'function') n.addEventListener(k.slice(2), v);
+        else if (v !== null && v !== undefined && v !== false) n.setAttribute(k, v === true ? '' : v);
+    }
+    for (const c of kids) { if (c == null) continue; n.append(c.nodeType ? c : document.createTextNode(c)); }
+    return n;
+}
+
+let _toastTimer = [];
+function toast(msg, type = '', ms = 3000) {
+    const t = el('div', { class: 'toast ' + type, text: msg });
+    $('#toasts').append(t);
+    const id = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 200); }, ms);
+    _toastTimer.push(id);
+    if (_toastTimer.length > 6) clearTimeout(_toastTimer.shift());
+}
+
+function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = el('a', { href: url, download: filename });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+function readFileAsText(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsText(file); }); }
+function readFileAsDataURL(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsDataURL(file); }); }
+function readFileAsArrayBuffer(file) { return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(r.result); r.onerror = rej; r.readAsArrayBuffer(file); }); }
+function dataURLToArrayBuffer(dataURL) {
+    const b64 = dataURL.split(',')[1] || '';
+    const bin = atob(b64); const len = bin.length; const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes.buffer;
+}
+function arrayBufferToBase64(buf) {
+    const bytes = new Uint8Array(buf); let bin = ''; const CH = 0x8000;
+    for (let i = 0; i < bytes.length; i += CH) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CH));
+    return btoa(bin);
+}
+function arrayBufferToDataURL(buf, mime) { return 'data:' + mime + ';base64,' + arrayBufferToBase64(buf); }
+
+/* ------------------------------- ZIP ----------------------------------- */
+/* Minimal, dependency-free ZIP writer (STORE method) with correct CRC-32.   */
+const CRC_TABLE = (() => {
+    const t = new Uint32Array(256);
+    for (let n = 0; n < 256; n++) {
+        let c = n;
+        for (let k = 0; k < 8; k++) c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);
+        t[n] = c >>> 0;
+    }
+    return t;
+})();
+function crc32(bytes) {
+    let c = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xFF] ^ (c >>> 8);
+    return (c ^ 0xFFFFFFFF) >>> 0;
+}
+function utf8Bytes(str) { return new TextEncoder().encode(str); }
+
+// dosDateTime from JS Date -> [time, date] 16-bit each
+function dosDateTime(d) {
+    const time = (d.getHours() << 11) | (d.getMinutes() << 5) | (Math.floor(d.getSeconds() / 2));
+    const date = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+    return [time & 0xFFFF, date & 0xFFFF];
+}
+
+/* files: [{ name, data:Uint8Array }] -> Blob */
+function buildZip(files) {
+    const now = new Date();
+    const [dtime, ddate] = dosDateTime(now);
+    const chunks = [];
+    const central = [];
+    let offset = 0;
+
+    const u16 = (v) => { const b = new Uint8Array(2); b[0] = v & 0xFF; b[1] = (v >>> 8) & 0xFF; return b; };
+    const u32 = (v) => { const b = new Uint8Array(4); b[0] = v & 0xFF; b[1] = (v >>> 8) & 0xFF; b[2] = (v >>> 16) & 0xFF; b[3] = (v >>> 24) & 0xFF; return b; };
+
+    for (const f of files) {
+        const nameBytes = utf8Bytes(f.name);
+        const data = f.data;
+        const crc = crc32(data);
+        const size = data.length;
+        // Local file header
+        const local = [
+            u32(0x04034b50), u16(20), u16(0x0800 /*UTF-8*/), u16(0 /*store*/),
+            u16(dtime), u16(ddate), u32(crc), u32(size), u32(size),
+            u16(nameBytes.length), u16(0), nameBytes, data
+        ];
+        for (const c of local) chunks.push(c);
+        const localLen = local.reduce((s, c) => s + c.length, 0);
+        // Central directory record
+        central.push([
+            u32(0x02014b50), u16(20), u16(20), u16(0x0800), u16(0),
+            u16(dtime), u16(ddate), u32(crc), u32(size), u32(size),
+            u16(nameBytes.length), u16(0), u16(0), u16(0), u16(0), u32(0),
+            u32(offset), nameBytes
+        ]);
+        offset += localLen;
+    }
+
+    const centralStart = offset;
+    let centralSize = 0;
+    for (const rec of central) { for (const c of rec) { chunks.push(c); centralSize += c.length; } }
+
+    chunks.push(u32(0x06054b50), u16(0), u16(0), u16(central.length), u16(central.length),
+        u32(centralSize), u32(centralStart), u16(0));
+
+    return new Blob(chunks, { type: 'application/zip' });
+}
+
+/* ------------------------------ Model ---------------------------------- */
+const APP_VERSION = 1;
+const STORAGE_KEY = 'lic_autosave_v1';
+
+function newProject() {
+    const pg = newPage('Main Menu', 1920, 1080);
+    return {
+        version: APP_VERSION,
+        name: 'Untitled',
+        defaultResolution: { width: 1920, height: 1080 },
+        pages: [pg],
+        assets: { images: {}, fonts: {} },
+        localization: { files: [] },
+        fontAssignment: { global: null, perLanguage: {} },
+        exportSettings: { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null }
+    };
+}
+
+function newPage(name, w, h) {
+    return {
+        id: uid('page'), name: name || 'Page',
+        resolution: (w && h) ? { width: w, height: h } : null, // null => inherit default
+        bg: '#1e1e22', bgOn: false,
+        objects: [] // index = z-order (last = top)
+    };
+}
+
+function baseObj(type, name, x, y, w, h) {
+    return { id: uid('obj'), type, name, x, y, width: w, height: h, rotation: 0, alpha: 1, visible: true, locked: false };
+}
+function newTextObject(x, y) {
+    return Object.assign(baseObj('text', 'Text', x, y, 480, 140), {
+        key: '', fallback: 'Sample Text',
+        fontId: null, fontSize: 64, fontWeight: 400, bold: false, italic: false,
+        color: '#ffffff', align: 'center', valign: 'middle',
+        letterSpacing: 0, lineSpacing: 1.2,
+        outlineWidth: 0, outlineColor: '#000000',
+        shadow: false, shadowColor: '#000000', shadowBlur: 4, shadowOffsetX: 2, shadowOffsetY: 2,
+        autoShrink: true, minFontSize: 12
+    });
+}
+function newImageObject(x, y, assetId, w, h) {
+    return Object.assign(baseObj('image', 'Image', x, y, w || 400, h || 400), {
+        assetId: assetId || null, scale: 1, tintEnabled: false, tint: '#ffffff',
+        flipX: false, flipY: false, blur: 0, glow: 0, glowColor: '#ffd479',
+        shadow: false, shadowColor: '#000000', shadowBlur: 8, shadowOffsetX: 0, shadowOffsetY: 6,
+        hueShift: 0, brightness: 100, contrast: 100
+    });
+}
+function newRectObject(x, y) {
+    return Object.assign(baseObj('rect', 'Rectangle', x, y, 400, 200), { color: '#6b7280' });
+}
+
+/* Global editor state */
+const state = {
+    project: newProject(),
+    pageId: null,
+    selection: [],          // array of object ids
+    previewLang: '__key',   // '__key' shows keys, otherwise language code
+    zoom: 1, panX: 0, panY: 0,
+    grid: false, snap: false, gridSize: 20,
+    clipboard: null,
+    dirty: false,
+    fontFaces: {},          // fontId -> { family, coverage }
+    imageCache: {},         // assetId -> HTMLImageElement
+    fitReport: {}           // objId -> {fits, lang}
+};
+state.pageId = state.project.pages[0].id;
+
+/* Accessors */
+function getPage(id) { return state.project.pages.find(p => p.id === (id || state.pageId)); }
+function curPage() { return getPage(state.pageId); }
+function pageResolution(pg) { pg = pg || curPage(); return pg.resolution || state.project.defaultResolution; }
+function curObjects() { return curPage().objects; }
+function getObj(id) { return curObjects().find(o => o.id === id); }
+function selectedObjects() { return state.selection.map(getObj).filter(Boolean); }
+function firstSelected() { return getObj(state.selection[0]); }
+function langList() {
+    const set = new Set();
+    for (const f of state.project.localization.files) for (const l of f.languages) set.add(l);
+    return Array.from(set);
+}
+
+/* ----------------------------- History --------------------------------- */
+const history = { past: [], future: [], committed: null, MAX: 120 };
+
+function initHistory() { history.committed = deepClone(state.project); history.past = []; history.future = []; }
+
+/* Call after any committed mutation to the project. */
+function commit() {
+    if (!history.committed) initHistory();
+    history.past.push(history.committed);
+    if (history.past.length > history.MAX) history.past.shift();
+    history.committed = deepClone(state.project);
+    history.future.length = 0;
+    markDirty();
+    scheduleAutosave();
+    refreshAll();
+}
+
+function restoreSnapshot(snap) {
+    state.project = deepClone(snap);
+    // validate page + selection
+    if (!getPage(state.pageId)) state.pageId = state.project.pages[0] && state.project.pages[0].id;
+    const ids = new Set(curObjects().map(o => o.id));
+    state.selection = state.selection.filter(id => ids.has(id));
+    ensureAssetsLoaded();
+    refreshAll();
+    updateUndoButtons();
+}
+
+function undo() {
+    if (!history.past.length) return;
+    history.future.push(history.committed);
+    history.committed = history.past.pop();
+    restoreSnapshot(history.committed);
+    toast('Undo', '', 900);
+}
+function redo() {
+    if (!history.future.length) return;
+    history.past.push(history.committed);
+    history.committed = history.future.pop();
+    restoreSnapshot(history.committed);
+    toast('Redo', '', 900);
+}
+function updateUndoButtons() {
+    $('#btn-undo').disabled = !history.past.length;
+    $('#btn-redo').disabled = !history.future.length;
+}
+
+function markDirty() { state.dirty = true; }
+
+/* Central refresh — re-renders every dependent UI surface. */
+let _rafPending = false;
+function refreshAll() {
+    renderPageTabs();
+    renderHierarchy();
+    renderAssets();
+    renderInspector();
+    renderCanvas();
+    updateStatus();
+    updateUndoButtons();
+    updateResLabel();
+    updatePreviewLangOptions();
+}
+function requestCanvas() {
+    if (_rafPending) return;
+    _rafPending = true;
+    requestAnimationFrame(() => { _rafPending = false; renderCanvas(); });
+}
+
+/* Autosave */
+let _autosaveTimer = null;
+function scheduleAutosave() {
+    if (_autosaveTimer) clearTimeout(_autosaveTimer);
+    _autosaveTimer = setTimeout(doAutosave, 1200);
+}
+function doAutosave() {
+    try {
+        const payload = JSON.stringify({ savedAt: Date.now(), project: state.project });
+        localStorage.setItem(STORAGE_KEY, payload);
+        const d = new Date();
+        $('#sb-auto').textContent = 'Autosaved ' + d.toLocaleTimeString();
+    } catch (e) {
+        $('#sb-auto').textContent = 'Autosave failed (storage full)';
+        console.warn('Autosave failed', e);
+    }
+}
+
+/* -------------------------- Localization -------------------------------- */
+const KNOWN_LANGS = new Set(['en', 'tr', 'de', 'fr', 'es', 'it', 'pt', 'ru', 'pl', 'nl', 'sv', 'no', 'da', 'fi',
+    'cs', 'sk', 'hu', 'ro', 'el', 'uk', 'ja', 'ko', 'zh', 'zh-cn', 'zh-tw', 'ar', 'he', 'hi', 'th', 'vi', 'id',
+    'ms', 'pt-br', 'es-419', 'en-us', 'en-gb']);
+function isLangCode(s) {
+    if (!s) return false;
+    const k = String(s).trim().toLowerCase();
+    if (KNOWN_LANGS.has(k)) return true;
+    return /^[a-z]{2,3}(-[a-z0-9]{2,4})?$/i.test(k) && k.length <= 6;
+}
+
+function parseCSV(text) {
+    const rows = []; let row = []; let field = ''; let i = 0; let inQ = false;
+    text = text.replace(/^﻿/, '');
+    while (i < text.length) {
+        const c = text[i];
+        if (inQ) {
+            if (c === '"') { if (text[i + 1] === '"') { field += '"'; i += 2; continue; } inQ = false; i++; continue; }
+            field += c; i++; continue;
+        }
+        if (c === '"') { inQ = true; i++; continue; }
+        if (c === ',') { row.push(field); field = ''; i++; continue; }
+        if (c === '\r') { i++; continue; }
+        if (c === '\n') { row.push(field); rows.push(row); row = []; field = ''; i++; continue; }
+        field += c; i++;
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter(r => r.length && !(r.length === 1 && r[0] === ''));
+}
+
+/* Returns { languages:[], keys:[], data:{key:{lang:val}} } */
+function buildLocFromCSV(text) {
+    const rows = parseCSV(text);
+    if (rows.length < 2) throw new Error('CSV needs a header row and at least one data row.');
+    const header = rows[0].map(h => h.trim());
+    const languages = header.slice(1).filter(Boolean);
+    const data = {}; const keys = [];
+    for (let r = 1; r < rows.length; r++) {
+        const cells = rows[r];
+        const key = (cells[0] || '').trim();
+        if (!key) continue;
+        if (!data[key]) { data[key] = {}; keys.push(key); }
+        languages.forEach((lang, idx) => { const v = cells[idx + 1]; if (v !== undefined) data[key][lang] = v; });
+    }
+    return { languages, keys, data };
+}
+
+function buildLocFromJSON(obj, filenameStem) {
+    if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('JSON root must be an object.');
+    const topKeys = Object.keys(obj);
+    if (!topKeys.length) throw new Error('Empty localization JSON.');
+
+    // Case: flat { key: "value" } single-language file
+    const allStringVals = topKeys.every(k => typeof obj[k] === 'string');
+    if (allStringVals) {
+        const lang = isLangCode(filenameStem) ? filenameStem.toLowerCase() : 'value';
+        const data = {}; const keys = [];
+        for (const k of topKeys) { data[k] = { [lang]: obj[k] }; keys.push(k); }
+        return { languages: [lang], keys, data };
+    }
+
+    // Decide structure A vs B
+    let bScore = topKeys.filter(isLangCode).length / topKeys.length;
+    let innerLangHits = 0, innerTotal = 0;
+    for (const k of topKeys) {
+        const v = obj[k];
+        if (v && typeof v === 'object' && !Array.isArray(v)) {
+            for (const ik of Object.keys(v)) { innerTotal++; if (isLangCode(ik)) innerLangHits++; }
+        }
+    }
+    const aScore = innerTotal ? innerLangHits / innerTotal : 0;
+
+    const data = {}; const langSet = new Set(); const keys = [];
+    const useB = (bScore >= 0.6 && bScore >= aScore) || (bScore > aScore && topKeys.length <= 12);
+
+    if (useB) { // { lang: { key: value } }
+        for (const lang of topKeys) {
+            const inner = obj[lang]; if (!inner || typeof inner !== 'object') continue;
+            langSet.add(lang);
+            for (const key of Object.keys(inner)) {
+                if (!data[key]) { data[key] = {}; keys.push(key); }
+                data[key][lang] = stringifyVal(inner[key]);
+            }
+        }
+    } else { // { key: { lang: value } }
+        for (const key of topKeys) {
+            const inner = obj[key];
+            if (inner == null) continue;
+            if (typeof inner !== 'object' || Array.isArray(inner)) continue;
+            data[key] = {}; keys.push(key);
+            for (const lang of Object.keys(inner)) { langSet.add(lang); data[key][lang] = stringifyVal(inner[lang]); }
+        }
+    }
+    return { languages: Array.from(langSet), keys, data };
+}
+function stringifyVal(v) { return v == null ? '' : (typeof v === 'string' ? v : (typeof v === 'object' ? JSON.stringify(v) : String(v))); }
+function slugLang(s) { return String(s).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '').slice(0, 24) || 'lang'; }
+
+/* Flat { key: "value" } JSON treated as a single language's strings. */
+function buildLocFromFlatJSON(obj, lang) {
+    if (obj == null || typeof obj !== 'object' || Array.isArray(obj)) throw new Error('JSON root must be an object of key:value pairs.');
+    const keys = Object.keys(obj);
+    if (!keys.length) throw new Error('Empty JSON.');
+    const data = {};
+    for (const k of keys) data[k] = { [lang]: stringifyVal(obj[k]) };
+    return { languages: [lang], keys, data };
+}
+
+async function importLocFile(file) {
+    const stem = file.name.replace(/\.[^.]+$/, '');
+    const text = await readFileAsText(file);
+    const isCSV = /\.csv$/i.test(file.name);
+    let parsed;
+    if (isCSV) parsed = buildLocFromCSV(text);
+    else parsed = buildLocFromJSON(JSON.parse(text), stem);
+    return {
+        id: uid('loc'), name: file.name, format: isCSV ? 'csv' : 'json',
+        languages: parsed.languages, keys: parsed.keys, data: parsed.data,
+        raw: text
+    };
+}
+
+/* Look up a value for key+lang across all loc files (later files win). */
+function locValue(key, lang) {
+    if (!key) return undefined;
+    let found;
+    for (const f of state.project.localization.files) {
+        if (f.data[key] && f.data[key][lang] != null && f.data[key][lang] !== '') found = f.data[key][lang];
+    }
+    return found;
+}
+function allLocKeys() {
+    const set = new Set();
+    for (const f of state.project.localization.files) for (const k of f.keys) set.add(k);
+    return Array.from(set);
+}
+
+/* Resolve the display string for a text object under the active preview/export language. */
+function resolveText(obj, lang) {
+    if (lang === '__key' || !lang) return obj.key ? obj.key : (obj.fallback || '');
+    if (!obj.key) return obj.fallback || '';
+    const v = locValue(obj.key, lang);
+    if (v != null) return v;
+    return obj.fallback || obj.key;
+}
+function isMissingLoc(obj, lang) {
+    if (lang === '__key' || !lang || !obj.key) return false;
+    return locValue(obj.key, lang) == null;
+}
+
+/* ------------------------------ Fonts ---------------------------------- */
+/* Real OpenType/TrueType cmap parser → glyph coverage (so font validation
+   is accurate rather than guessed). Supports formats 0,4,6,12 + ttc. */
+function parseFontCoverage(buffer) {
+    const dv = new DataView(buffer);
+    const set = new Set();
+    const ranges = [];
+    try {
+        let base = 0;
+        const tag0 = dv.getUint32(0);
+        if (tag0 === 0x74746366) base = dv.getUint32(12); // 'ttcf' collection -> first font
+        const numTables = dv.getUint16(base + 4);
+        let cmapOff = -1;
+        for (let i = 0; i < numTables; i++) {
+            const rec = base + 12 + i * 16;
+            const tag = String.fromCharCode(dv.getUint8(rec), dv.getUint8(rec + 1), dv.getUint8(rec + 2), dv.getUint8(rec + 3));
+            if (tag === 'cmap') { cmapOff = dv.getUint32(rec + 8); break; }
+        }
+        if (cmapOff < 0) return null;
+        const nSub = dv.getUint16(cmapOff + 2);
+        let best = -1, bestScore = -1;
+        for (let i = 0; i < nSub; i++) {
+            const r = cmapOff + 4 + i * 8;
+            const plat = dv.getUint16(r), enc = dv.getUint16(r + 2), off = dv.getUint32(r + 4);
+            let score = 0;
+            if (plat === 3 && enc === 10) score = 5;
+            else if (plat === 0 && enc >= 4) score = 5;
+            else if (plat === 3 && enc === 1) score = 4;
+            else if (plat === 0) score = 3;
+            else if (plat === 3 && enc === 0) score = 1;
+            else score = 2;
+            if (score > bestScore) { bestScore = score; best = cmapOff + off; }
+        }
+        if (best < 0) return null;
+        const fmt = dv.getUint16(best);
+        if (fmt === 4) {
+            const segX2 = dv.getUint16(best + 6); const segCount = segX2 / 2;
+            const endO = best + 14, startO = endO + segX2 + 2, deltaO = startO + segX2, rangeO = deltaO + segX2;
+            for (let s = 0; s < segCount; s++) {
+                const end = dv.getUint16(endO + s * 2);
+                const start = dv.getUint16(startO + s * 2);
+                const delta = dv.getInt16(deltaO + s * 2);
+                const ro = dv.getUint16(rangeO + s * 2);
+                if (start === 0xFFFF) continue;
+                for (let c = start; c <= end && c !== 0xFFFF; c++) {
+                    let g;
+                    if (ro === 0) g = (c + delta) & 0xFFFF;
+                    else {
+                        const gi = rangeO + s * 2 + ro + (c - start) * 2;
+                        if (gi + 1 >= buffer.byteLength) { g = 0; }
+                        else { g = dv.getUint16(gi); if (g !== 0) g = (g + delta) & 0xFFFF; }
+                    }
+                    if (g !== 0) set.add(c);
+                }
+            }
+        } else if (fmt === 12) {
+            const nGroups = dv.getUint32(best + 12);
+            for (let g = 0; g < nGroups; g++) {
+                const gr = best + 16 + g * 12;
+                const s = dv.getUint32(gr), e = dv.getUint32(gr + 4);
+                ranges.push([s, e]);
+            }
+        } else if (fmt === 6) {
+            const first = dv.getUint16(best + 6); const count = dv.getUint16(best + 8);
+            for (let i = 0; i < count; i++) { if (dv.getUint16(best + 10 + i * 2) !== 0) set.add(first + i); }
+        } else if (fmt === 0) {
+            for (let i = 0; i < 256; i++) { if (dv.getUint8(best + 6 + i) !== 0) set.add(i); }
+        } else { return null; }
+    } catch (e) { console.warn('cmap parse failed', e); return null; }
+    return {
+        set, ranges,
+        has(cp) { if (this.set.has(cp)) return true; for (const r of this.ranges) if (cp >= r[0] && cp <= r[1]) return true; return false; }
+    };
+}
+
+function fontFamilyId(id) { return 'licfont_' + id; }
+
+async function registerFont(id, asset) {
+    if (state.fontFaces[id]) return state.fontFaces[id];
+    const family = fontFamilyId(id);
+    let coverage = null;
+    try {
+        if (asset.subsets && asset.subsets.length) {
+            // Web font split into per-subset files (woff2); register one face each with its unicode-range.
+            for (const s of asset.subsets) {
+                const buf = dataURLToArrayBuffer(s.data);
+                const face = new FontFace(family, buf, s.unicodeRange ? { unicodeRange: s.unicodeRange } : {});
+                await face.load(); document.fonts.add(face);
+            }
+            // woff2 isn't sfnt — coverage stays null so validation is skipped (no false warnings).
+        } else {
+            const buf = dataURLToArrayBuffer(asset.data);
+            coverage = parseFontCoverage(buf.slice(0));
+            const face = new FontFace(family, buf);
+            await face.load(); document.fonts.add(face);
+        }
+    } catch (e) { console.warn('Font load failed for', asset.name, e); }
+    state.fontFaces[id] = { family, coverage };
+    return state.fontFaces[id];
+}
+
+/* Decide which font id applies to an object under a language. */
+function resolveFontId(obj, lang) {
+    const fa = state.project.fontAssignment;
+    if (lang && lang !== '__key' && fa.perLanguage[lang] && state.project.assets.fonts[fa.perLanguage[lang]])
+        return fa.perLanguage[lang];
+    if (obj.fontId && state.project.assets.fonts[obj.fontId]) return obj.fontId;
+    if (fa.global && state.project.assets.fonts[fa.global]) return fa.global;
+    return null;
+}
+function fontFamilyFor(obj, lang) {
+    const id = resolveFontId(obj, lang);
+    if (id && state.fontFaces[id]) return '"' + state.fontFaces[id].family + '"';
+    return null;
+}
+function fontStackFor(obj, lang) {
+    const f = fontFamilyFor(obj, lang);
+    return (f ? f + ', ' : '') + 'system-ui, -apple-system, Segoe UI, Arial, sans-serif';
+}
+
+/* Returns array of unsupported characters (excluding whitespace) for a text obj+lang. */
+function checkFontCoverage(obj, lang) {
+    const id = resolveFontId(obj, lang);
+    if (!id) return [];
+    const cov = state.fontFaces[id] && state.fontFaces[id].coverage;
+    if (!cov) return [];
+    const str = resolveText(obj, lang);
+    const missing = new Set();
+    for (const ch of str) {
+        const cp = ch.codePointAt(0);
+        if (cp <= 0x20 || cp === 0xA0) continue;        // whitespace/control
+        if (!cov.has(cp)) missing.add(ch);
+    }
+    return Array.from(missing);
+}
+
+/* Loads all project assets into runtime caches. Triggers a re-render once ready. */
+function ensureAssetsLoaded() {
+    const imgs = state.project.assets.images;
+    for (const id in imgs) {
+        if (!state.imageCache[id]) {
+            const im = new Image();
+            im.onload = () => { requestCanvas(); };
+            im.onerror = () => console.warn('Image failed', id);
+            im.src = imgs[id].data;
+            state.imageCache[id] = im;
+        }
+    }
+    const fonts = state.project.assets.fonts;
+    let pending = 0;
+    for (const id in fonts) {
+        if (!state.fontFaces[id]) {
+            pending++;
+            registerFont(id, fonts[id]).then(() => { recomputeFit(); requestCanvas(); });
+        }
+    }
+    // prune caches for removed assets
+    for (const id in state.imageCache) if (!imgs[id]) delete state.imageCache[id];
+}
+
+/* ----------------------------- Rendering -------------------------------- */
+const D2R = Math.PI / 180;
+
+function setFont(ctx, obj, size, lang) {
+    const family = fontStackFor(obj, lang);
+    const weight = obj.bold ? '700' : (obj.fontWeight || 400);
+    const ital = obj.italic ? 'italic ' : '';
+    ctx.font = `${ital}${weight} ${size}px ${family}`;
+    try { ctx.letterSpacing = (obj.letterSpacing || 0) + 'px'; } catch (e) {}
+}
+
+function wrapLines(ctx, text, maxWidth) {
+    const out = [];
+    const paragraphs = String(text).split('\n');
+    for (const para of paragraphs) {
+        if (para === '') { out.push(''); continue; }
+        const words = para.split(/ /);
+        let line = '';
+        for (let w = 0; w < words.length; w++) {
+            const word = words[w];
+            const trial = line === '' ? word : line + ' ' + word;
+            // Keep whole words: wrap to the next line when the word doesn't fit.
+            // A word wider than the box stays intact and overflows; layoutTextObject's
+            // auto-shrink then reduces the font size instead of splitting characters.
+            if (line === '' || ctx.measureText(trial).width <= maxWidth) line = trial;
+            else { out.push(line); line = word; }
+        }
+        out.push(line);
+    }
+    return out;
+}
+
+function layoutTextObject(ctx, obj, lang) {
+    const text = resolveText(obj, lang) || '';
+    const start = Math.max(2, obj.fontSize);
+    const minSize = obj.autoShrink ? Math.max(2, Math.min(obj.minFontSize || 12, start)) : start;
+    let size = start, lines = [], lineHeight = 0, blockH = 0, widest = 0, fits = false;
+    for (size = start; size >= minSize; size--) {
+        setFont(ctx, obj, size, lang);
+        lines = wrapLines(ctx, text, obj.width);
+        lineHeight = size * (obj.lineSpacing || 1.2);
+        blockH = lines.length * lineHeight;
+        widest = 0; for (const ln of lines) widest = Math.max(widest, ctx.measureText(ln).width);
+        if (widest <= obj.width + 0.5 && blockH <= obj.height + 0.5) { fits = true; break; }
+        if (!obj.autoShrink) break;
+    }
+    if (size < minSize) { size = minSize; setFont(ctx, obj, size, lang); lines = wrapLines(ctx, text, obj.width); lineHeight = size * (obj.lineSpacing || 1.2); blockH = lines.length * lineHeight; }
+    return { text, size, lines, lineHeight, blockH, fits };
+}
+
+function drawTextObject(ctx, obj, lang) {
+    const L = layoutTextObject(ctx, obj, lang);
+    const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+    ctx.save();
+    ctx.globalAlpha = obj.alpha;
+    if (obj.rotation) { ctx.translate(cx, cy); ctx.rotate(obj.rotation * D2R); ctx.translate(-cx, -cy); }
+    setFont(ctx, obj, L.size, lang);
+    ctx.textBaseline = 'top';
+    let tx, align;
+    if (obj.align === 'left') { tx = obj.x; align = 'left'; }
+    else if (obj.align === 'right') { tx = obj.x + obj.width; align = 'right'; }
+    else { tx = obj.x + obj.width / 2; align = 'center'; }
+    ctx.textAlign = align;
+    let startY = obj.y;
+    if (obj.valign === 'bottom') startY = obj.y + (obj.height - L.blockH);
+    else if (obj.valign !== 'top') startY = obj.y + (obj.height - L.blockH) / 2;
+
+    const paint = () => {
+        for (let i = 0; i < L.lines.length; i++) {
+            const ln = L.lines[i];
+            const y = startY + i * L.lineHeight + (L.lineHeight - L.size) / 2;
+            if (obj.outlineWidth > 0) {
+                ctx.lineWidth = obj.outlineWidth * 2; ctx.strokeStyle = obj.outlineColor;
+                ctx.lineJoin = 'round'; ctx.miterLimit = 2; ctx.strokeText(ln, tx, y);
+            }
+            ctx.fillStyle = obj.color; ctx.fillText(ln, tx, y);
+        }
+    };
+    if (obj.shadow) {
+        ctx.save();
+        ctx.shadowColor = obj.shadowColor; ctx.shadowBlur = obj.shadowBlur;
+        ctx.shadowOffsetX = obj.shadowOffsetX; ctx.shadowOffsetY = obj.shadowOffsetY;
+        paint();
+        ctx.restore();
+    }
+    paint();
+    ctx.restore();
+    try { ctx.letterSpacing = '0px'; } catch (e) {}
+    return L;
+}
+
+function tintImage(img, color) {
+    const key = color;
+    if (!img._tintCache) img._tintCache = {};
+    if (img._tintCache[key]) return img._tintCache[key];
+    const c = document.createElement('canvas');
+    c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const x = c.getContext('2d');
+    x.drawImage(img, 0, 0);
+    x.globalCompositeOperation = 'multiply'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(img, 0, 0);
+    img._tintCache[key] = c;
+    return c;
+}
+
+function drawImageObject(ctx, obj) {
+    const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+    const w = obj.width * (obj.scale || 1), h = obj.height * (obj.scale || 1);
+    const img = obj.assetId && state.imageCache[obj.assetId];
+    ctx.save();
+    ctx.globalAlpha = obj.alpha;
+    ctx.translate(cx, cy);
+    if (obj.rotation) ctx.rotate(obj.rotation * D2R);
+    ctx.scale(obj.flipX ? -1 : 1, obj.flipY ? -1 : 1);
+    if (!img || !img.complete || !img.naturalWidth) {
+        // placeholder for missing/unloaded image
+        ctx.globalAlpha = obj.alpha * 0.5;
+        ctx.fillStyle = '#33333a'; ctx.fillRect(-w / 2, -h / 2, w, h);
+        ctx.strokeStyle = '#55555f'; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+        ctx.fillStyle = '#888'; ctx.font = `${Math.max(12, Math.min(w, h) / 10)}px system-ui`;
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText('no image', 0, 0);
+        ctx.restore(); return;
+    }
+    const filters = [];
+    if (obj.blur > 0) filters.push(`blur(${obj.blur}px)`);
+    if (obj.brightness !== 100) filters.push(`brightness(${obj.brightness}%)`);
+    if (obj.contrast !== 100) filters.push(`contrast(${obj.contrast}%)`);
+    if (obj.hueShift) filters.push(`hue-rotate(${obj.hueShift}deg)`);
+    if (obj.shadow) filters.push(`drop-shadow(${obj.shadowOffsetX}px ${obj.shadowOffsetY}px ${obj.shadowBlur}px ${obj.shadowColor})`);
+    if (obj.glow > 0) filters.push(`drop-shadow(0 0 ${obj.glow}px ${obj.glowColor})`);
+    ctx.filter = filters.length ? filters.join(' ') : 'none';
+    const src = obj.tintEnabled ? tintImage(img, obj.tint) : img;
+    ctx.drawImage(src, -w / 2, -h / 2, w, h);
+    ctx.restore();
+}
+
+function drawRectObject(ctx, obj) {
+    const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+    ctx.save();
+    ctx.globalAlpha = obj.alpha;
+    ctx.translate(cx, cy);
+    if (obj.rotation) ctx.rotate(obj.rotation * D2R);
+    ctx.fillStyle = obj.color;
+    ctx.fillRect(-obj.width / 2, -obj.height / 2, obj.width, obj.height);
+    ctx.restore();
+}
+
+/* Render a whole page for a language onto a 2D context (export + preview share this). */
+function renderPageToCtx(ctx, page, lang, opts = {}) {
+    const res = pageResolution(page);
+    ctx.save();
+    ctx.clearRect(0, 0, res.width, res.height);
+    if (page.bgOn) { ctx.fillStyle = page.bg; ctx.fillRect(0, 0, res.width, res.height); }
+    else if (opts.bgFallback) { ctx.fillStyle = opts.bgFallback; ctx.fillRect(0, 0, res.width, res.height); }
+    for (const obj of page.objects) {
+        if (!obj.visible) continue;
+        if (obj.type === 'text') { const fit = drawTextObject(ctx, obj, lang); if (opts.fitOut) opts.fitOut[obj.id] = fit; }
+        else if (obj.type === 'image') drawImageObject(ctx, obj);
+        else if (obj.type === 'rect') drawRectObject(ctx, obj);
+    }
+    ctx.restore();
+    ctx.filter = 'none';
+    try { ctx.letterSpacing = '0px'; } catch (e) {}
+}
+
+function drawGrid(ctx, res) {
+    const g = state.gridSize;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let x = 0; x <= res.width; x += g) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, res.height); }
+    for (let y = 0; y <= res.height; y += g) { ctx.moveTo(0, y + 0.5); ctx.lineTo(res.width, y + 0.5); }
+    ctx.stroke();
+    ctx.restore();
+}
+
+function recomputeFit() { requestCanvas(); }
+
+/* ---------------------------- Canvas view ------------------------------- */
+function applyStageTransform() {
+    const st = $('#stage');
+    st.style.transform = `translate(${state.panX}px, ${state.panY}px) scale(${state.zoom})`;
+}
+function canvasToScreen(cx, cy) { return { x: state.panX + cx * state.zoom, y: state.panY + cy * state.zoom }; }
+function screenToCanvas(clientX, clientY) {
+    const r = $('#canvas-wrap').getBoundingClientRect();
+    return { x: (clientX - r.left - state.panX) / state.zoom, y: (clientY - r.top - state.panY) / state.zoom };
+}
+function rotatePt(px, py, cx, cy, ang) {
+    const dx = px - cx, dy = py - cy, ca = Math.cos(ang), sa = Math.sin(ang);
+    return { x: cx + dx * ca - dy * sa, y: cy + dx * sa + dy * ca };
+}
+
+function renderCanvas() {
+    const pg = curPage();
+    if (!pg) return;
+    const res = pageResolution(pg);
+    const cv = $('#view');
+    if (cv.width !== res.width) cv.width = res.width;
+    if (cv.height !== res.height) cv.height = res.height;
+    cv.style.width = res.width + 'px';
+    cv.style.height = res.height + 'px';
+    const ctx = cv.getContext('2d');
+    state.fitReport = {};
+    renderPageToCtx(ctx, pg, state.previewLang, { fitOut: state.fitReport });
+    if (state.grid) drawGrid(ctx, res);
+    applyStageTransform();
+    computeWarnings();
+    renderSelectionOverlay();
+    updateFitWarning();
+}
+
+const HANDLE_DEFS = [
+    ['nw', 0, 0], ['n', .5, 0], ['ne', 1, 0], ['e', 1, .5],
+    ['se', 1, 1], ['s', .5, 1], ['sw', 0, 1], ['w', 0, .5]
+];
+
+function renderSelectionOverlay() {
+    const ov = $('#overlay');
+    ov.innerHTML = '';
+    const pg = curPage(); if (!pg) return;
+
+    // warning markers (overflow / font coverage) for all text objects
+    for (const obj of pg.objects) {
+        if (!obj.visible) continue;
+        const warn = state.objWarn[obj.id];
+        if (warn && (warn.overflow || (warn.fontMissing && warn.fontMissing.length)) && !state.selection.includes(obj.id)) {
+            ov.append(makeBox(obj, 'sel-box warn'));
+        }
+    }
+
+    const sel = selectedObjects();
+    for (const obj of sel) {
+        const isText = obj.type === 'text';
+        const warn = state.objWarn[obj.id];
+        const cls = (isText ? 'safe-box' : 'sel-box') + ((warn && (warn.overflow || (warn.fontMissing && warn.fontMissing.length))) ? ' warn' : '');
+        ov.append(makeBox(obj, cls));
+    }
+
+    // handles only for a single, unlocked selection
+    if (sel.length === 1 && !sel[0].locked) {
+        const obj = sel[0];
+        const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+        const ang = (obj.rotation || 0) * D2R;
+        for (const [name, fx, fy] of HANDLE_DEFS) {
+            const lp = rotatePt(obj.x + obj.width * fx, obj.y + obj.height * fy, cx, cy, ang);
+            const s = canvasToScreen(lp.x, lp.y);
+            const h = el('div', { class: 'handle ' + name, 'data-handle': name });
+            h.style.left = (s.x - 5) + 'px'; h.style.top = (s.y - 5) + 'px';
+            h.addEventListener('pointerdown', (e) => startResize(e, name));
+            ov.append(h);
+        }
+        // rotation handle + line
+        const nLocal = rotatePt(cx, obj.y, cx, cy, ang);
+        const nScr = canvasToScreen(nLocal.x, nLocal.y);
+        const rLocal = rotatePt(cx, obj.y - 26 / state.zoom, cx, cy, ang);
+        const rScr = canvasToScreen(rLocal.x, rLocal.y);
+        const line = el('div', { class: 'rot-line' });
+        const len = Math.hypot(rScr.x - nScr.x, rScr.y - nScr.y);
+        line.style.left = nScr.x + 'px'; line.style.top = nScr.y + 'px';
+        line.style.height = len + 'px';
+        line.style.transformOrigin = '0 0';
+        line.style.transform = `rotate(${Math.atan2(rScr.y - nScr.y, rScr.x - nScr.x) - Math.PI / 2}rad)`;
+        ov.append(line);
+        const rh = el('div', { class: 'handle rot', 'data-handle': 'rotate', title: 'Rotate' });
+        rh.style.left = (rScr.x - 5) + 'px'; rh.style.top = (rScr.y - 5) + 'px';
+        rh.addEventListener('pointerdown', startRotate);
+        ov.append(rh);
+    }
+}
+
+function makeBox(obj, cls) {
+    const s = canvasToScreen(obj.x, obj.y);
+    const b = el('div', { class: cls });
+    b.style.left = s.x + 'px'; b.style.top = s.y + 'px';
+    b.style.width = (obj.width * state.zoom) + 'px';
+    b.style.height = (obj.height * state.zoom) + 'px';
+    if (obj.rotation) { b.style.transformOrigin = 'center'; b.style.transform = `rotate(${obj.rotation}deg)`; }
+    return b;
+}
+
+/* zoom / pan */
+function setZoom(z, anchorClientX, anchorClientY) {
+    const old = state.zoom;
+    z = clamp(z, 0.05, 8);
+    if (z === old) return;
+    const r = $('#canvas-wrap').getBoundingClientRect();
+    const ax = (anchorClientX !== undefined) ? anchorClientX - r.left : r.width / 2;
+    const ay = (anchorClientY !== undefined) ? anchorClientY - r.top : r.height / 2;
+    // keep the canvas point under the anchor fixed
+    state.panX = ax - (ax - state.panX) * (z / old);
+    state.panY = ay - (ay - state.panY) * (z / old);
+    state.zoom = z;
+    updateZoomLabel();
+    renderCanvas();
+}
+function updateZoomLabel() { $('#zoom-label').textContent = Math.round(state.zoom * 100) + '%'; }
+function fitToScreen() {
+    const pg = curPage(); const res = pageResolution(pg);
+    const r = $('#canvas-wrap').getBoundingClientRect();
+    const pad = 60;
+    const z = Math.min((r.width - pad) / res.width, (r.height - pad) / res.height);
+    state.zoom = clamp(z, 0.05, 8);
+    state.panX = (r.width - res.width * state.zoom) / 2;
+    state.panY = (r.height - res.height * state.zoom) / 2;
+    updateZoomLabel();
+    renderCanvas();
+}
+
+/* warnings */
+function computeWarnings() {
+    state.objWarn = {};
+    const lang = state.previewLang;
+    for (const obj of curObjects()) {
+        if (obj.type !== 'text') continue;
+        const fit = state.fitReport[obj.id];
+        const overflow = fit ? !fit.fits : false;
+        const fontMissing = checkFontCoverage(obj, lang);
+        if (overflow || fontMissing.length) state.objWarn[obj.id] = { overflow, fontMissing };
+    }
+}
+function updateFitWarning() {
+    let overflow = 0, fontw = 0;
+    for (const id in state.objWarn) { if (state.objWarn[id].overflow) overflow++; if (state.objWarn[id].fontMissing.length) fontw++; }
+    const pill = $('#fit-warn');
+    if (overflow || fontw) {
+        pill.classList.add('show');
+        const parts = [];
+        if (overflow) parts.push(overflow + ' overflow');
+        if (fontw) parts.push(fontw + ' font');
+        $('#fit-warn-text').textContent = parts.join(' · ');
+    } else pill.classList.remove('show');
+}
+
+function updateStatus() {
+    const sel = selectedObjects();
+    if (!sel.length) { $('#sb-sel').textContent = 'No selection'; $('#sb-pos').textContent = ''; }
+    else if (sel.length === 1) {
+        const o = sel[0];
+        $('#sb-sel').textContent = `${o.name} (${o.type})`;
+        $('#sb-pos').textContent = `x ${Math.round(o.x)}  y ${Math.round(o.y)}  ·  ${Math.round(o.width)}×${Math.round(o.height)}  ·  ${Math.round(o.rotation || 0)}°`;
+    } else { $('#sb-sel').textContent = sel.length + ' selected'; $('#sb-pos').textContent = ''; }
+    $('#sb-proj').textContent = state.project.name + (state.dirty ? ' *' : '');
+}
+function updateResLabel() {
+    const res = pageResolution();
+    $('#res-label').textContent = res.width + '×' + res.height;
+    const pg = curPage();
+    $('#page-bg').value = pg.bg || '#1e1e22';
+    $('#page-bg-on').checked = !!pg.bgOn;
+}
+state.objWarn = {};
+
+/* --------------------------- Interaction -------------------------------- */
+let drag = null;
+state.spaceDown = false;
+
+function pointInObj(obj, x, y) {
+    const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+    const p = rotatePt(x, y, cx, cy, -(obj.rotation || 0) * D2R);
+    return p.x >= obj.x && p.x <= obj.x + obj.width && p.y >= obj.y && p.y <= obj.y + obj.height;
+}
+function hitTest(x, y) {
+    const objs = curObjects();
+    for (let i = objs.length - 1; i >= 0; i--) {
+        const o = objs[i];
+        if (!o.visible || o.locked) continue;
+        if (pointInObj(o, x, y)) return o;
+    }
+    // second pass allow locked (so it can be selected even if not movable)
+    for (let i = objs.length - 1; i >= 0; i--) {
+        const o = objs[i];
+        if (!o.visible) continue;
+        if (pointInObj(o, x, y)) return o;
+    }
+    return null;
+}
+function snapV(v) { return state.snap ? Math.round(v / state.gridSize) * state.gridSize : v; }
+
+function selectOnly(id) { state.selection = id ? [id] : []; refreshSelectionUI(); }
+function refreshSelectionUI() { renderHierarchy(); renderInspector(); renderSelectionOverlay(); updateStatus(); }
+
+function setupCanvasInteraction() {
+    const wrap = $('#canvas-wrap');
+
+    wrap.addEventListener('pointerdown', (e) => {
+        if (e.target.classList.contains('handle')) return; // handled by handle listeners
+        if (e.target.closest('.canvas-ctrl')) return; // let overlay buttons receive their own clicks
+        wrap.setPointerCapture(e.pointerId);
+        const panMode = state.spaceDown || e.button === 1;
+        if (panMode) {
+            drag = { mode: 'pan', sx: e.clientX, sy: e.clientY, px: state.panX, py: state.panY };
+            wrap.style.cursor = 'grabbing';
+            return;
+        }
+        if (e.button !== 0) return;
+        const p = screenToCanvas(e.clientX, e.clientY);
+        const hit = hitTest(p.x, p.y);
+        if (hit) {
+            if (e.shiftKey) {
+                const i = state.selection.indexOf(hit.id);
+                if (i >= 0) state.selection.splice(i, 1); else state.selection.push(hit.id);
+            } else if (!state.selection.includes(hit.id)) {
+                state.selection = [hit.id];
+            }
+            refreshSelectionUI();
+            const movable = selectedObjects().filter(o => !o.locked);
+            drag = {
+                mode: 'move', moved: false, sx: p.x, sy: p.y,
+                items: movable.map(o => ({ id: o.id, x: o.x, y: o.y }))
+            };
+        } else {
+            if (!e.shiftKey) { state.selection = []; refreshSelectionUI(); }
+            drag = { mode: 'marquee', sx: p.x, sy: p.y, base: e.shiftKey ? state.selection.slice() : [] };
+        }
+    });
+
+    wrap.addEventListener('pointermove', (e) => {
+        if (!drag) {
+            // hover cursor
+            return;
+        }
+        if (drag.mode === 'pan') {
+            state.panX = drag.px + (e.clientX - drag.sx);
+            state.panY = drag.py + (e.clientY - drag.sy);
+            applyStageTransform(); renderSelectionOverlay();
+            return;
+        }
+        const p = screenToCanvas(e.clientX, e.clientY);
+        if (drag.mode === 'move') {
+            let dx = p.x - drag.sx, dy = p.y - drag.sy;
+            if (Math.abs(dx) + Math.abs(dy) > 0.5) drag.moved = true;
+            for (const it of drag.items) {
+                const o = getObj(it.id); if (!o) continue;
+                o.x = snapV(it.x + dx); o.y = snapV(it.y + dy);
+            }
+            requestCanvas(); renderInspectorLight(); updateStatus();
+        } else if (drag.mode === 'resize') {
+            doResize(p);
+        } else if (drag.mode === 'rotate') {
+            doRotate(p, e.shiftKey);
+        } else if (drag.mode === 'marquee') {
+            drag.cur = p; drawMarquee();
+        }
+    });
+
+    wrap.addEventListener('pointerup', (e) => {
+        if (!drag) return;
+        wrap.style.cursor = '';
+        if (drag.mode === 'marquee') {
+            finalizeMarquee();
+            $('#overlay').querySelectorAll('.marquee').forEach(n => n.remove());
+        }
+        const changed = (drag.mode === 'move' && drag.moved) || drag.mode === 'resize' || drag.mode === 'rotate';
+        drag = null;
+        if (changed) commit(); else refreshSelectionUI();
+    });
+
+    // wheel zoom / pan
+    wrap.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        if (e.ctrlKey || e.metaKey || !e.shiftKey) {
+            const factor = e.deltaY < 0 ? 1.12 : 1 / 1.12;
+            setZoom(state.zoom * factor, e.clientX, e.clientY);
+        } else {
+            state.panX -= e.deltaX; state.panY -= e.deltaY;
+            applyStageTransform(); renderSelectionOverlay();
+        }
+    }, { passive: false });
+}
+
+function drawMarquee() {
+    let m = $('#overlay .marquee');
+    if (!m) { m = el('div', { class: 'marquee' }); $('#overlay').append(m); }
+    const a = canvasToScreen(Math.min(drag.sx, drag.cur.x), Math.min(drag.sy, drag.cur.y));
+    const w = Math.abs(drag.cur.x - drag.sx) * state.zoom, h = Math.abs(drag.cur.y - drag.sy) * state.zoom;
+    m.style.left = a.x + 'px'; m.style.top = a.y + 'px'; m.style.width = w + 'px'; m.style.height = h + 'px';
+}
+function finalizeMarquee() {
+    if (!drag.cur) { return; }
+    const x1 = Math.min(drag.sx, drag.cur.x), y1 = Math.min(drag.sy, drag.cur.y);
+    const x2 = Math.max(drag.sx, drag.cur.x), y2 = Math.max(drag.sy, drag.cur.y);
+    const sel = new Set(drag.base);
+    for (const o of curObjects()) {
+        if (!o.visible) continue;
+        const cx = o.x + o.width / 2, cy = o.y + o.height / 2;
+        if (cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2) sel.add(o.id);
+    }
+    state.selection = Array.from(sel);
+    refreshSelectionUI();
+}
+
+function startResize(e, handle) {
+    e.stopPropagation(); e.preventDefault();
+    const obj = firstSelected(); if (!obj || obj.locked) return;
+    const a = (obj.rotation || 0) * D2R;
+    const ux = { x: Math.cos(a), y: Math.sin(a) }, uy = { x: -Math.sin(a), y: Math.cos(a) };
+    const c0 = { x: obj.x + obj.width / 2, y: obj.y + obj.height / 2 };
+    drag = {
+        mode: 'resize', handle,
+        ux, uy, c0, w0: obj.width, h0: obj.height,
+        movesE: handle.includes('e'), movesW: handle.includes('w'),
+        movesN: handle.includes('n'), movesS: handle.includes('s')
+    };
+    $('#canvas-wrap').setPointerCapture(e.pointerId);
+}
+function doResize(p) {
+    const o = firstSelected(); if (!o) return;
+    const { ux, uy, c0, w0, h0 } = drag;
+    const d = { x: p.x - c0.x, y: p.y - c0.y };
+    const du = d.x * ux.x + d.y * ux.y;
+    const dv = d.x * uy.x + d.y * uy.y;
+    const MIN = 8;
+    let Lu = -w0 / 2, Ru = w0 / 2, Tv = -h0 / 2, Bv = h0 / 2;
+    if (drag.movesE) Ru = Math.max(Lu + MIN, du);
+    if (drag.movesW) Lu = Math.min(Ru - MIN, du);
+    if (drag.movesS) Bv = Math.max(Tv + MIN, dv);
+    if (drag.movesN) Tv = Math.min(Bv - MIN, dv);
+    let newW = Ru - Lu, newH = Bv - Tv;
+    const cu = (Lu + Ru) / 2, cv = (Tv + Bv) / 2;
+    const nc = { x: c0.x + ux.x * cu + uy.x * cv, y: c0.y + ux.y * cu + uy.y * cv };
+    if (state.snap) { newW = Math.max(MIN, snapV(newW)); newH = Math.max(MIN, snapV(newH)); }
+    o.width = round(newW, 1); o.height = round(newH, 1);
+    o.x = round(nc.x - newW / 2, 1); o.y = round(nc.y - newH / 2, 1);
+    drag.moved = true;
+    requestCanvas(); renderInspectorLight(); updateStatus();
+}
+function startRotate(e) {
+    e.stopPropagation(); e.preventDefault();
+    const obj = firstSelected(); if (!obj || obj.locked) return;
+    const c = { x: obj.x + obj.width / 2, y: obj.y + obj.height / 2 };
+    const p = screenToCanvas(e.clientX, e.clientY);
+    drag = { mode: 'rotate', c, startMouse: Math.atan2(p.y - c.y, p.x - c.x), startRot: obj.rotation || 0 };
+    $('#canvas-wrap').setPointerCapture(e.pointerId);
+}
+function doRotate(p, snap15) {
+    const o = firstSelected(); if (!o) return;
+    const ang = Math.atan2(p.y - drag.c.y, p.x - drag.c.x);
+    let deg = drag.startRot + (ang - drag.startMouse) / D2R;
+    if (snap15) deg = Math.round(deg / 15) * 15;
+    o.rotation = round((deg % 360 + 360) % 360, 1);
+    drag.moved = true;
+    requestCanvas(); renderInspectorLight(); updateStatus();
+}
+
+/* ---------------------- Object ops & Hierarchy -------------------------- */
+function placePos(w, h) {
+    const res = pageResolution();
+    const n = curObjects().length;
+    const off = (n % 6) * 24;
+    return { x: Math.round((res.width - w) / 2 + off), y: Math.round((res.height - h) / 2 + off) };
+}
+function addObject(obj) {
+    curObjects().push(obj);
+    state.selection = [obj.id];
+    commit();
+    return obj;
+}
+function addText() { const o = newTextObject(0, 0); const p = placePos(o.width, o.height); o.x = p.x; o.y = p.y; addObject(o); toast('Text added'); }
+function addRect() { const o = newRectObject(0, 0); const p = placePos(o.width, o.height); o.x = p.x; o.y = p.y; addObject(o); toast('Rectangle added'); }
+function addImage(assetId) {
+    const ids = Object.keys(state.project.assets.images);
+    const aid = assetId || ids[ids.length - 1] || null;
+    let w = 400, h = 400;
+    if (aid && state.imageCache[aid] && state.imageCache[aid].naturalWidth) {
+        const im = state.imageCache[aid]; const res = pageResolution();
+        const sc = Math.min(1, (res.width * 0.5) / im.naturalWidth, (res.height * 0.5) / im.naturalHeight);
+        w = Math.round(im.naturalWidth * sc); h = Math.round(im.naturalHeight * sc);
+    }
+    const o = newImageObject(0, 0, aid, w, h); const p = placePos(w, h); o.x = p.x; o.y = p.y;
+    if (aid && state.project.assets.images[aid]) o.name = state.project.assets.images[aid].name.replace(/\.[^.]+$/, '');
+    addObject(o);
+    if (!aid) toast('Image layer added — assign an asset in the Inspector', 'warn');
+}
+
+function duplicateSelection() {
+    const sel = selectedObjects(); if (!sel.length) return;
+    const objs = curObjects(); const clones = [];
+    for (const o of sel) {
+        const c = deepClone(o); c.id = uid('obj'); c.x += 24; c.y += 24; c.name = o.name + ' copy';
+        objs.push(c); clones.push(c.id);
+    }
+    state.selection = clones; commit();
+}
+function deleteSelection() {
+    if (!state.selection.length) return;
+    const set = new Set(state.selection);
+    const pg = curPage();
+    pg.objects = pg.objects.filter(o => !set.has(o.id));
+    state.selection = [];
+    commit();
+}
+function copySelection() {
+    const sel = selectedObjects(); if (!sel.length) return;
+    state.clipboard = sel.map(deepClone);
+    toast(sel.length + ' copied', '', 1200);
+}
+function pasteClipboard() {
+    if (!state.clipboard || !state.clipboard.length) return;
+    const objs = curObjects(); const ids = [];
+    for (const o of state.clipboard) {
+        const c = deepClone(o); c.id = uid('obj'); c.x += 24; c.y += 24; objs.push(c); ids.push(c.id);
+    }
+    state.selection = ids; commit();
+    toast(ids.length + ' pasted', '', 1200);
+}
+function moveLayer(dir) {
+    const sel = selectedObjects(); if (sel.length !== 1) return;
+    const objs = curObjects(); const i = objs.indexOf(sel[0]);
+    const j = dir === 'up' ? i + 1 : i - 1; // up = higher z = later in array
+    if (j < 0 || j >= objs.length) return;
+    [objs[i], objs[j]] = [objs[j], objs[i]];
+    commit();
+}
+function toggleVis(id) { const o = getObj(id); if (o) { o.visible = !o.visible; commit(); } }
+function toggleLock(id) { const o = getObj(id); if (o) { o.locked = !o.locked; if (o.locked) state.selection = state.selection.filter(s => s !== id); commit(); } }
+function renameObject(id, name) { const o = getObj(id); if (o) { o.name = name || o.type; commit(); } }
+
+const TYPE_ICON = { text: 'T', image: '🖼', rect: '▭' };
+function layerThumb(o) {
+    if (o.type === 'rect') return el('span', { class: 'ico swatch', style: 'background:' + (o.color || '#000') });
+    if (o.type === 'image') {
+        const asset = o.assetId && state.project.assets.images[o.assetId];
+        if (asset && asset.data) return el('span', { class: 'ico thumb' }, el('img', { src: asset.data, alt: '' }));
+        return el('span', { class: 'ico', text: TYPE_ICON.image });
+    }
+    return el('span', { class: 'ico', text: TYPE_ICON[o.type] || '?' });
+}
+
+function renderHierarchy() {
+    const list = $('#layer-list');
+    list.innerHTML = '';
+    const objs = curObjects();
+    if (!objs.length) {
+        list.append(el('div', { class: 'empty-hint', html: 'No layers yet.<br>Use <b>+ Text / + Image / + Rect</b> to add objects.' }));
+        return;
+    }
+    for (let i = objs.length - 1; i >= 0; i--) {
+        const o = objs[i];
+        const sel = state.selection.includes(o.id);
+        const row = el('div', {
+            class: 'layer' + (sel ? ' selected' : '') + (o.visible ? '' : ' is-hidden') + (o.locked ? ' locked' : ''),
+            'data-id': o.id, draggable: 'true'
+        });
+        const ico = layerThumb(o);
+        const nm = el('span', { class: 'nm', text: o.name });
+        nm.addEventListener('dblclick', (e) => { e.stopPropagation(); beginRename(nm, o); });
+        const keyChip = (o.type === 'text' && o.key) ? el('span', { class: 'key-chip', text: o.key, title: 'Loc key: ' + o.key }) : null;
+        const vis = el('span', { class: 'vis', text: o.visible ? '👁' : '⌀', title: 'Show/Hide' });
+        vis.addEventListener('click', (e) => { e.stopPropagation(); toggleVis(o.id); });
+        const lock = el('span', { class: 'lock', text: o.locked ? '🔒' : '🔓', title: 'Lock/Unlock' });
+        lock.addEventListener('click', (e) => { e.stopPropagation(); toggleLock(o.id); });
+        const del = el('span', { class: 'layer-del', text: '🗑', title: 'Delete layer' });
+        del.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const pg = curPage();
+            pg.objects = pg.objects.filter(obj => obj.id !== o.id);
+            state.selection = state.selection.filter(id => id !== o.id);
+            commit();
+        });
+        row.append(ico, nm);
+        if (keyChip) row.append(keyChip);
+        row.append(vis, lock, del);
+        row.addEventListener('click', (e) => layerClick(e, o, i));
+        // drag reorder
+        row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', o.id); e.dataTransfer.effectAllowed = 'move'; });
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            const r = row.getBoundingClientRect();
+            const top = (e.clientY - r.top) < r.height / 2;
+            row.classList.toggle('dragover-top', top);
+            row.classList.toggle('dragover-bottom', !top);
+        });
+        row.addEventListener('dragleave', () => row.classList.remove('dragover-top', 'dragover-bottom'));
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const dragged = e.dataTransfer.getData('text/plain');
+            const r = row.getBoundingClientRect();
+            const before = (e.clientY - r.top) < r.height / 2; // before in display = above = higher z
+            row.classList.remove('dragover-top', 'dragover-bottom');
+            reorderLayer(dragged, o.id, before);
+        });
+        list.append(row);
+    }
+}
+function layerClick(e, o, idx) {
+    if (e.metaKey || e.ctrlKey) {
+        const i = state.selection.indexOf(o.id);
+        if (i >= 0) state.selection.splice(i, 1); else state.selection.push(o.id);
+    } else if (e.shiftKey && state.selection.length) {
+        const objs = curObjects();
+        const last = objs.findIndex(x => x.id === state.selection[state.selection.length - 1]);
+        const lo = Math.min(last, idx), hi = Math.max(last, idx);
+        const range = objs.slice(lo, hi + 1).map(x => x.id);
+        state.selection = Array.from(new Set(state.selection.concat(range)));
+    } else {
+        state.selection = [o.id];
+    }
+    refreshSelectionUI();
+}
+function beginRename(span, o) {
+    const inp = el('input', { type: 'text', value: o.name });
+    span.textContent = ''; span.append(inp); inp.focus(); inp.select();
+    const done = () => { renameObject(o.id, inp.value.trim()); };
+    inp.addEventListener('blur', done);
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); else if (e.key === 'Escape') { inp.value = o.name; inp.blur(); } e.stopPropagation(); });
+}
+function reorderLayer(draggedId, targetId, before) {
+    if (draggedId === targetId) return;
+    const objs = curObjects();
+    const di = objs.findIndex(o => o.id === draggedId);
+    if (di < 0) return;
+    const [moved] = objs.splice(di, 1);
+    let ti = objs.findIndex(o => o.id === targetId);
+    // display "before" (above) means higher z => insert AFTER target in array
+    if (before) ti = ti + 1;
+    objs.splice(ti, 0, moved);
+    commit();
+}
+
+/* ----------------------------- Inspector -------------------------------- */
+state.inspCollapsed = new Set();
+const fmtNum = (n) => (Math.round((n || 0) * 100) / 100).toString();
+
+function liveUpdate() { requestCanvas(); updateStatus(); }
+
+function bindNum(obj, prop, opts = {}) {
+    const inp = el('input', { type: 'number', value: fmtNum(obj[prop]) });
+    if (opts.step != null) inp.step = opts.step;
+    if (opts.min != null) inp.min = opts.min;
+    if (opts.max != null) inp.max = opts.max;
+    if (opts.id) inp.id = opts.id;
+    inp.addEventListener('input', () => {
+        let v = parseFloat(inp.value); if (isNaN(v)) return;
+        if (opts.min != null) v = Math.max(opts.min, v);
+        if (opts.max != null) v = Math.min(opts.max, v);
+        applyToTargets(obj, prop, v, opts.targetsAll); liveUpdate();
+    });
+    inp.addEventListener('change', () => commit());
+    return inp;
+}
+function bindRange(obj, prop, min, max, step, opts = {}) {
+    const inp = el('input', { type: 'range', min, max, step });
+    inp.value = obj[prop];
+    const badge = el('span', { class: 'val-badge', text: fmtNum(obj[prop]) + (opts.unit || '') });
+    inp.addEventListener('input', () => { const v = parseFloat(inp.value); applyToTargets(obj, prop, v, opts.targetsAll); badge.textContent = fmtNum(v) + (opts.unit || ''); liveUpdate(); });
+    inp.addEventListener('change', () => commit());
+    const wrap = el('div', { class: 'ctl' }, inp, badge);
+    return wrap;
+}
+function bindColor(obj, prop, opts = {}) {
+    const inp = el('input', { type: 'color', value: toHex(obj[prop]) });
+    inp.addEventListener('input', () => { applyToTargets(obj, prop, inp.value, opts.targetsAll); liveUpdate(); });
+    inp.addEventListener('change', () => commit());
+    return inp;
+}
+function bindCheck(obj, prop, label) {
+    const inp = el('input', { type: 'checkbox' }); inp.checked = !!obj[prop];
+    inp.addEventListener('change', () => { obj[prop] = inp.checked; commit(); });
+    return el('label', { style: 'display:flex;align-items:center;gap:6px;color:var(--text-dim);cursor:pointer' }, inp, label || '');
+}
+function bindText(obj, prop, opts = {}) {
+    const inp = el(opts.area ? 'textarea' : 'input', opts.area ? {} : { type: 'text' });
+    inp.value = obj[prop] || '';
+    inp.addEventListener('input', () => { obj[prop] = inp.value; liveUpdate(); });
+    inp.addEventListener('change', () => commit());
+    return inp;
+}
+function bindSelect(obj, prop, options, opts = {}) {
+    const sel = el('select');
+    for (const op of options) sel.append(el('option', { value: op.value }, op.label));
+    sel.value = (obj[prop] == null ? '' : String(obj[prop]));
+    sel.addEventListener('change', () => {
+        let v = sel.value;
+        if (opts.number) v = v === '' ? null : parseFloat(v);
+        if (opts.nullable && v === '') v = null;
+        obj[prop] = v; commit();
+    });
+    return sel;
+}
+function applyToTargets(obj, prop, v, all) {
+    obj[prop] = v;
+    if (all) for (const o of selectedObjects()) if (o !== obj) o[prop] = v;
+}
+function toHex(c) {
+    if (!c) return '#000000';
+    if (/^#[0-9a-f]{6}$/i.test(c)) return c;
+    if (/^#[0-9a-f]{3}$/i.test(c)) return '#' + c.slice(1).split('').map(x => x + x).join('');
+    return '#000000';
+}
+
+function row(label, ...ctl) {
+    const c = el('div', { class: 'ctl' }, ...ctl);
+    return el('div', { class: 'row' }, el('label', { text: label }), c);
+}
+function field(label, ctl) { return el('div', { class: 'field' }, el('label', { text: label }), ctl); }
+function group(title, key, children, opts = {}) {
+    const collapsed = state.inspCollapsed.has(key);
+    const g = el('div', { class: 'insp-group' + (collapsed ? ' collapsed' : '') });
+    const head = el('div', { class: 'gh' }, el('span', { class: 'chev', text: '▾' }), el('span', { text: title }));
+    head.addEventListener('click', () => { if (state.inspCollapsed.has(key)) state.inspCollapsed.delete(key); else state.inspCollapsed.add(key); g.classList.toggle('collapsed'); });
+    const body = el('div', { class: 'gc' }, ...children);
+    g.append(head, body);
+    return g;
+}
+function seg(obj, prop, options) {
+    const wrap = el('div', { class: 'seg' });
+    for (const op of options) {
+        const b = el('button', { class: obj[prop] === op.value ? 'on' : '', text: op.label, title: op.title || op.label });
+        b.addEventListener('click', () => { obj[prop] = op.value; commit(); });
+        wrap.append(b);
+    }
+    return wrap;
+}
+
+function renderInspector() {
+    const host = $('#inspector');
+    host.innerHTML = '';
+    const sel = selectedObjects();
+    $('#insp-title').textContent = sel.length === 1 ? 'Inspector — ' + sel[0].name : 'Inspector';
+    if (!sel.length) {
+        host.append(el('div', { class: 'insp-empty', html: 'Select a layer to edit its properties.<br><br><span class="mini">Tip: hold <span class="kbd">Shift</span> to multi-select, drag on empty canvas to marquee.</span>' }));
+        return;
+    }
+    if (sel.length > 1) { renderMultiInspector(host, sel); return; }
+    const o = sel[0];
+    if (o.type === 'text') renderTextInspector(host, o);
+    else if (o.type === 'image') renderImageInspector(host, o);
+    else if (o.type === 'rect') renderRectInspector(host, o);
+}
+
+function geomGroup(o, extra = []) {
+    return group('Transform', 'transform', [
+        el('div', { class: 'row2' },
+            field('X', bindNum(o, 'x', { step: 1, id: 'insp-x' })),
+            field('Y', bindNum(o, 'y', { step: 1, id: 'insp-y' }))),
+        el('div', { class: 'row2' },
+            field('Width', bindNum(o, 'width', { step: 1, min: 1, id: 'insp-w' })),
+            field('Height', bindNum(o, 'height', { step: 1, min: 1, id: 'insp-h' }))),
+        el('div', { class: 'row2' },
+            field('Rotation°', bindNum(o, 'rotation', { step: 1, id: 'insp-rot' })),
+            ...extra),
+        row('Alpha', bindRange(o, 'alpha', 0, 1, 0.01))
+    ]);
+}
+
+function renderTextInspector(host, o) {
+    const keyOpts = [{ value: '', label: '— none (use fallback) —' }].concat(allLocKeys().map(k => ({ value: k, label: k })));
+    const previewVal = resolveText(o, state.previewLang);
+    host.append(
+        group('Content', 'content', [
+            row('Loc Key', bindSelect(o, 'key', keyOpts, { nullable: false })),
+            field('Fallback text', bindText(o, 'fallback', { area: true })),
+            el('div', { class: 'mini', html: 'Preview: <b>' + escapeHtml(previewVal || '∅') + '</b>' })
+        ]),
+        group('Safe Area & Transform', 'transform', [
+            el('div', { class: 'mini', text: 'Text is constrained to this rectangle (wrap → shrink).' }),
+            el('div', { class: 'row2' },
+                field('X', bindNum(o, 'x', { step: 1, id: 'insp-x' })),
+                field('Y', bindNum(o, 'y', { step: 1, id: 'insp-y' }))),
+            el('div', { class: 'row2' },
+                field('Width', bindNum(o, 'width', { step: 1, min: 1, id: 'insp-w' })),
+                field('Height', bindNum(o, 'height', { step: 1, min: 1, id: 'insp-h' }))),
+            el('div', { class: 'row2' },
+                field('Rotation°', bindNum(o, 'rotation', { step: 1, id: 'insp-rot' })),
+                field('Alpha', bindNum(o, 'alpha', { step: 0.05, min: 0, max: 1 }))),
+        ]),
+        group('Font', 'font', [
+            row('Font', bindSelect(o, 'fontId', fontOptions(), { nullable: true })),
+            el('div', { class: 'row2' },
+                field('Size', bindNum(o, 'fontSize', { step: 1, min: 2 })),
+                field('Weight', bindSelect(o, 'fontWeight', weightOptions(), { number: true }))),
+            row('Style', segStyle(o)),
+            row('Align', seg(o, 'align', [{ value: 'left', label: '⬅' }, { value: 'center', label: '⬌' }, { value: 'right', label: '➡' }])),
+            row('V-Align', seg(o, 'valign', [{ value: 'top', label: '⤒' }, { value: 'middle', label: '⊟' }, { value: 'bottom', label: '⤓' }])),
+            el('div', { class: 'row2' },
+                field('Letter sp.', bindNum(o, 'letterSpacing', { step: 0.5 })),
+                field('Line sp.', bindNum(o, 'lineSpacing', { step: 0.05, min: 0.5 }))),
+            row('Color', bindColor(o, 'color')),
+        ]),
+        group('Outline', 'outline', [
+            el('div', { class: 'row2' },
+                field('Width', bindNum(o, 'outlineWidth', { step: 0.5, min: 0 })),
+                field('Color', bindColor(o, 'outlineColor'))),
+        ]),
+        group('Shadow', 'shadow', [
+            row('Enabled', bindCheck(o, 'shadow', 'Drop shadow')),
+            row('Color', bindColor(o, 'shadowColor')),
+            el('div', { class: 'row2' },
+                field('Blur', bindNum(o, 'shadowBlur', { step: 1, min: 0 })),
+                field('—', el('span'))),
+            el('div', { class: 'row2' },
+                field('Offset X', bindNum(o, 'shadowOffsetX', { step: 1 })),
+                field('Offset Y', bindNum(o, 'shadowOffsetY', { step: 1 }))),
+        ]),
+        group('Auto-fit', 'autofit', [
+            row('Shrink', bindCheck(o, 'autoShrink', 'Auto-reduce size to fit')),
+            row('Min size', bindNum(o, 'minFontSize', { step: 1, min: 2 })),
+            fitStatus(o)
+        ])
+    );
+}
+function segStyle(o) {
+    const wrap = el('div', { class: 'seg' });
+    const b = el('button', { class: o.bold ? 'on' : '', html: '<b>B</b>' });
+    b.addEventListener('click', () => { o.bold = !o.bold; commit(); });
+    const it = el('button', { class: o.italic ? 'on' : '', html: '<i>I</i>' });
+    it.addEventListener('click', () => { o.italic = !o.italic; commit(); });
+    wrap.append(b, it); return wrap;
+}
+function fitStatus(o) {
+    const warn = state.objWarn[o.id];
+    const div = el('div', { class: 'mini' });
+    if (!warn || (!warn.overflow && !(warn.fontMissing && warn.fontMissing.length))) {
+        div.innerHTML = '<span style="color:var(--ok)">✓ Text fits' + (state.previewLang !== '__key' ? ' in current language' : '') + '</span>';
+    } else {
+        let h = '';
+        if (warn.overflow) h += '<span style="color:var(--warn)">⚠ Text overflows safe area (even at min size)</span><br>';
+        if (warn.fontMissing && warn.fontMissing.length) h += '<span style="color:var(--warn)">⚠ Font missing glyphs: ' + escapeHtml(warn.fontMissing.slice(0, 12).join(' ')) + '</span>';
+        div.innerHTML = h;
+    }
+    return div;
+}
+
+function renderImageInspector(host, o) {
+    const imgOpts = [{ value: '', label: '— none —' }].concat(Object.keys(state.project.assets.images).map(id => ({ value: id, label: state.project.assets.images[id].name })));
+    const thumb = o.assetId && state.project.assets.images[o.assetId];
+    host.append(
+        group('Source', 'source', [
+            row('Asset', bindSelect(o, 'assetId', imgOpts, { nullable: true })),
+            thumb ? el('img', { src: thumb.data, style: 'max-width:100%;max-height:120px;object-fit:contain;border:1px solid var(--border);border-radius:3px;background:#0a0a0a' }) : el('div', { class: 'mini', text: 'No asset assigned.' })
+        ]),
+        geomGroup(o, [field('Scale', bindNum(o, 'scale', { step: 0.05, min: 0.01 }))]),
+        group('Flip', 'flip', [
+            el('div', { class: 'row' }, bindCheck(o, 'flipX', 'Flip X'), bindCheck(o, 'flipY', 'Flip Y'))
+        ]),
+        group('Color', 'imgcolor', [
+            row('Tint', bindCheck(o, 'tintEnabled', 'Enable tint')),
+            row('Color', bindColor(o, 'tint')),
+            row('Hue', bindRange(o, 'hueShift', -180, 180, 1, { unit: '°' })),
+            row('Bright', bindRange(o, 'brightness', 0, 300, 1, { unit: '%' })),
+            row('Contrast', bindRange(o, 'contrast', 0, 300, 1, { unit: '%' })),
+        ]),
+        group('Effects', 'imgfx', [
+            row('Blur', bindRange(o, 'blur', 0, 40, 0.5, { unit: 'px' })),
+            row('Glow', bindRange(o, 'glow', 0, 60, 1, { unit: 'px' })),
+            row('Glow col', bindColor(o, 'glowColor')),
+            row('Shadow', bindCheck(o, 'shadow', 'Drop shadow')),
+            row('Sh. color', bindColor(o, 'shadowColor')),
+            el('div', { class: 'row2' },
+                field('Sh. blur', bindNum(o, 'shadowBlur', { step: 1, min: 0 })),
+                field('—', el('span'))),
+            el('div', { class: 'row2' },
+                field('Sh. X', bindNum(o, 'shadowOffsetX', { step: 1 })),
+                field('Sh. Y', bindNum(o, 'shadowOffsetY', { step: 1 }))),
+        ])
+    );
+}
+
+function renderRectInspector(host, o) {
+    host.append(
+        geomGroup(o),
+        group('Fill', 'fill', [row('Color', bindColor(o, 'color'))])
+    );
+}
+
+function renderMultiInspector(host, sel) {
+    const o = sel[0];
+    host.append(
+        group('Multiple (' + sel.length + ')', 'multi', [
+            el('div', { class: 'mini', text: 'Editing applies to all selected layers.' }),
+            row('Alpha', bindRange(o, 'alpha', 0, 1, 0.01, { targetsAll: true })),
+            el('div', { class: 'row' },
+                el('button', { text: 'Align L', onclick: () => alignSel('left') }),
+                el('button', { text: 'Center H', onclick: () => alignSel('centerH') }),
+                el('button', { text: 'Align R', onclick: () => alignSel('right') })),
+            el('div', { class: 'row' },
+                el('button', { text: 'Align T', onclick: () => alignSel('top') }),
+                el('button', { text: 'Center V', onclick: () => alignSel('centerV') }),
+                el('button', { text: 'Align B', onclick: () => alignSel('bottom') })),
+            el('div', { class: 'row' },
+                el('button', { text: 'Duplicate', onclick: duplicateSelection }),
+                el('button', { class: 'danger', text: 'Delete', onclick: deleteSelection }))
+        ])
+    );
+}
+function alignSel(mode) {
+    const sel = selectedObjects(); if (sel.length < 2) return;
+    const minX = Math.min(...sel.map(o => o.x)), maxX = Math.max(...sel.map(o => o.x + o.width));
+    const minY = Math.min(...sel.map(o => o.y)), maxY = Math.max(...sel.map(o => o.y + o.height));
+    for (const o of sel) {
+        if (mode === 'left') o.x = minX;
+        else if (mode === 'right') o.x = maxX - o.width;
+        else if (mode === 'centerH') o.x = (minX + maxX) / 2 - o.width / 2;
+        else if (mode === 'top') o.y = minY;
+        else if (mode === 'bottom') o.y = maxY - o.height;
+        else if (mode === 'centerV') o.y = (minY + maxY) / 2 - o.height / 2;
+    }
+    commit();
+}
+
+function fontOptions() {
+    const fonts = state.project.assets.fonts;
+    return [{ value: '', label: 'Default (auto)' }].concat(Object.keys(fonts).map(id => ({ value: id, label: fonts[id].name })));
+}
+function weightOptions() { return [100, 200, 300, 400, 500, 600, 700, 800, 900].map(w => ({ value: w, label: String(w) })); }
+
+/* Lightweight update of geometry fields while dragging (no DOM rebuild). */
+function renderInspectorLight() {
+    const o = firstSelected(); if (!o || state.selection.length !== 1) return;
+    const set = (id, v) => { const n = document.getElementById(id); if (n && document.activeElement !== n) n.value = fmtNum(v); };
+    set('insp-x', o.x); set('insp-y', o.y); set('insp-w', o.width); set('insp-h', o.height); set('insp-rot', o.rotation);
+}
+
+/* ------------------------------ Modals ---------------------------------- */
+function openModal(backEl, title, bodyNode, footNodes, sizeClass = '') {
+    backEl.innerHTML = '';
+    const modal = el('div', { class: 'modal ' + sizeClass });
+    const head = el('div', { class: 'modal-head' }, el('h3', { text: title }), el('button', { class: 'x-close', text: '✕', onclick: () => closeModal(backEl) }));
+    const body = el('div', { class: 'modal-body' }, bodyNode);
+    const foot = el('div', { class: 'modal-foot' }, ...(footNodes || []));
+    modal.append(head, body, foot);
+    backEl.append(modal);
+    backEl.classList.add('open');
+    backEl.onclick = (e) => { if (e.target === backEl) closeModal(backEl); };
+    return { modal, body };
+}
+function closeModal(backEl) { backEl.classList.remove('open'); backEl.innerHTML = ''; }
+function closeAllModals() { $$('.modal-back').forEach(m => { m.classList.remove('open'); m.innerHTML = ''; }); }
+
+/* --------------------------- Assets panel ------------------------------- */
+async function importAssets(fileList) {
+    const files = Array.from(fileList).filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name));
+    if (!files.length) { toast('No image files', 'warn'); return; }
+    for (const f of files) {
+        const data = await readFileAsDataURL(f);
+        const id = uid('img');
+        state.project.assets.images[id] = { name: f.name, type: f.type || 'image/png', data };
+    }
+    ensureAssetsLoaded();
+    commit();
+    toast(files.length + ' image' + (files.length > 1 ? 's' : '') + ' imported', 'ok');
+}
+function deleteAsset(id) {
+    const a = state.project.assets.images[id];
+    if (!a) return;
+    // find every layer (and the page it lives on) that references this image
+    const usage = [];
+    for (const pg of state.project.pages) for (const o of pg.objects) if (o.type === 'image' && o.assetId === id) usage.push({ pg, o });
+    const pageNames = Array.from(new Set(usage.map(u => u.pg.name)));
+    let removeRefs = false;
+    if (usage.length) {
+        if (!confirm('Delete image "' + a.name + '" from the project?\n\nUsed on: ' + pageNames.join(', ') +
+            ' (' + usage.length + ' layer' + (usage.length > 1 ? 's' : '') + ').')) return;
+        removeRefs = confirm('Also delete the ' + usage.length + ' layer reference' + (usage.length > 1 ? 's' : '') + ' that use this image?\n\n' +
+            'OK = remove those image layers.\nCancel = keep the layers (they will show a missing-image placeholder).');
+    } else if (!confirm('Delete image "' + a.name + '" from the project?')) return;
+    delete state.project.assets.images[id];
+    delete state.imageCache[id];
+    for (const pg of state.project.pages) {
+        if (removeRefs) pg.objects = pg.objects.filter(o => !(o.type === 'image' && o.assetId === id));
+        else for (const o of pg.objects) if (o.type === 'image' && o.assetId === id) o.assetId = null;
+    }
+    const live = new Set(curObjects().map(o => o.id));
+    state.selection = state.selection.filter(sid => live.has(sid));
+    commit();
+}
+function renderAssets() {
+    const grid = $('#asset-grid'); grid.innerHTML = '';
+    const imgs = state.project.assets.images;
+    const ids = Object.keys(imgs);
+    if (!ids.length) { grid.append(el('div', { class: 'empty-hint', style: 'grid-column:1/-1', text: 'No images yet.' })); return; }
+    for (const id of ids) {
+        const a = imgs[id];
+        const card = el('div', { class: 'asset', draggable: 'true', title: a.name });
+        card.append(
+            el('img', { class: 'thumb', src: a.data, draggable: 'false' }),
+            el('div', { class: 'nm', text: a.name }),
+            el('button', { class: 'del', text: '✕', title: 'Delete asset', onclick: (e) => { e.stopPropagation(); deleteAsset(id); } })
+        );
+        card.addEventListener('dblclick', () => addImage(id));
+        card.addEventListener('click', () => { if (state.selection.length === 1) { const o = firstSelected(); if (o && o.type === 'image') { o.assetId = id; commit(); toast('Asset assigned to ' + o.name, '', 1500); return; } } });
+        card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('application/x-lic-asset', id); e.dataTransfer.effectAllowed = 'copy'; });
+        grid.append(card);
+    }
+}
+
+/* ----------------------------- Page tabs -------------------------------- */
+function renderPageTabs() {
+    const bar = $('#page-tabs'); bar.innerHTML = '';
+    state.project.pages.forEach((pg) => {
+        const tab = el('div', { class: 'page-tab' + (pg.id === state.pageId ? ' active' : ''), 'data-id': pg.id });
+        const name = el('span', { class: 'pt-name', text: pg.name });
+        name.addEventListener('dblclick', (e) => { e.stopPropagation(); beginPageRename(name, pg); });
+        tab.append(name);
+        if (state.project.pages.length > 1) {
+            const close = el('span', { class: 'pt-close', text: '✕', title: 'Delete page' });
+            close.addEventListener('click', (e) => { e.stopPropagation(); deletePage(pg.id); });
+            tab.append(close);
+        }
+        tab.addEventListener('click', () => selectPage(pg.id));
+        bar.append(tab);
+    });
+    const add = el('button', { class: 'page-add', text: '+ Page', title: 'New page', onclick: addPage });
+    const dup = el('button', { class: 'page-add', text: '⧉ Duplicate', title: 'Duplicate current page', onclick: () => duplicatePage(state.pageId) });
+    bar.append(add, dup);
+}
+function selectPage(id) {
+    if (id === state.pageId) return;
+    state.pageId = id; state.selection = [];
+    refreshAll(); fitToScreen();
+}
+function addPage() {
+    const def = state.project.defaultResolution;
+    const pg = newPage('Page ' + (state.project.pages.length + 1), def.width, def.height);
+    pg.resolution = null; // inherit default
+    state.project.pages.push(pg);
+    state.pageId = pg.id; state.selection = [];
+    commit(); fitToScreen();
+}
+function duplicatePage(id) {
+    const src = getPage(id);
+    if (!src) return;
+    const copy = deepClone(src);
+    copy.id = uid('page');
+    copy.name = src.name + ' copy';
+    for (const o of copy.objects) o.id = uid('obj');
+    const i = state.project.pages.findIndex(p => p.id === src.id);
+    state.project.pages.splice(i + 1, 0, copy);
+    state.pageId = copy.id; state.selection = [];
+    commit(); fitToScreen();
+    toast('Duplicated "' + src.name + '"', 'ok');
+}
+function deletePage(id) {
+    if (state.project.pages.length <= 1) { toast('At least one page is required', 'warn'); return; }
+    const pg = getPage(id);
+    if (!confirm('Delete page "' + pg.name + '"? This removes its layers.')) return;
+    const i = state.project.pages.findIndex(p => p.id === id);
+    state.project.pages.splice(i, 1);
+    if (state.pageId === id) state.pageId = state.project.pages[Math.max(0, i - 1)].id;
+    state.selection = [];
+    commit(); fitToScreen();
+}
+function beginPageRename(span, pg) {
+    const inp = el('input', { type: 'text', value: pg.name, style: 'width:120px;font-size:12px' });
+    span.textContent = ''; span.append(inp); inp.focus(); inp.select();
+    const done = () => { pg.name = inp.value.trim() || pg.name; commit(); };
+    inp.addEventListener('blur', done);
+    inp.addEventListener('keydown', (e) => { e.stopPropagation(); if (e.key === 'Enter') inp.blur(); if (e.key === 'Escape') { inp.value = pg.name; inp.blur(); } });
+}
+
+function openResolutionEditor() {
+    const pg = curPage();
+    const cur = pageResolution(pg);
+    const inherit = !pg.resolution;
+    const wInp = el('input', { type: 'number', min: 1, value: cur.width });
+    const hInp = el('input', { type: 'number', min: 1, value: cur.height });
+    const inheritChk = el('input', { type: 'checkbox' }); inheritChk.checked = inherit;
+    const defChk = el('input', { type: 'checkbox' });
+    const presets = [[1920, 1080], [1280, 720], [3840, 2160], [1024, 1024], [2048, 2048], [1080, 1920], [800, 600]];
+    const presetWrap = el('div', { class: 'lang-pick' });
+    for (const [w, h] of presets) presetWrap.append(el('button', { text: w + '×' + h, onclick: () => { wInp.value = w; hInp.value = h; inheritChk.checked = false; } }));
+    const body = el('div', {},
+        el('label', { class: 'help', style: 'display:flex;align-items:center;gap:8px;margin-bottom:10px' }, inheritChk, ' Inherit project default (' + state.project.defaultResolution.width + '×' + state.project.defaultResolution.height + ')'),
+        el('div', { class: 'row2' }, field('Width', wInp), field('Height', hInp)),
+        el('div', { style: 'margin:12px 0 6px' }, el('div', { class: 'mini', text: 'Presets' }), presetWrap),
+        el('label', { class: 'help', style: 'display:flex;align-items:center;gap:8px;margin-top:10px' }, defChk, ' Also set as project default for new pages')
+    );
+    const save = el('button', { class: 'primary', text: 'Apply', onclick: () => {
+        const w = clamp(Math.round(+wInp.value || 1), 1, 16384), h = clamp(Math.round(+hInp.value || 1), 1, 16384);
+        if (inheritChk.checked) pg.resolution = null; else pg.resolution = { width: w, height: h };
+        if (defChk.checked) state.project.defaultResolution = { width: w, height: h };
+        closeModal($('#modal-generic')); commit(); fitToScreen();
+    }});
+    openModal($('#modal-generic'), 'Page Resolution — ' + pg.name, body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-generic')) }), save], 'sm');
+}
+
+function updatePreviewLangOptions() {
+    const sel = $('#preview-lang');
+    const langs = langList();
+    const prev = state.previewLang;
+    sel.innerHTML = '';
+    sel.append(el('option', { value: '__key' }, '— Show keys —'));
+    for (const l of langs) sel.append(el('option', { value: l }, l));
+    sel.value = (prev === '__key' || langs.includes(prev)) ? prev : '__key';
+    state.previewLang = sel.value;
+}
+
+/* ---------------------- Loc & Font managers ----------------------------- */
+function pickFiles(accept, multiple) {
+    return new Promise((res) => {
+        const inp = el('input', { type: 'file', accept, class: 'hidden' });
+        if (multiple) inp.multiple = true;
+        inp.addEventListener('change', () => { res(inp.files); inp.remove(); });
+        document.body.append(inp); inp.click();
+    });
+}
+
+async function importLocFiles(fileList) {
+    let ok = 0;
+    for (const f of Array.from(fileList)) {
+        try { const lf = await importLocFile(f); state.project.localization.files.push(lf); ok++; }
+        catch (e) { toast('Failed to parse ' + f.name + ': ' + e.message, 'err', 5000); }
+    }
+    if (ok) { commit(); toast(ok + ' localization file(s) loaded', 'ok'); openLocManager(); }
+}
+async function importLangJSON(fileList) {
+    let ok = 0;
+    for (const f of Array.from(fileList || [])) {
+        try {
+            const stem = f.name.replace(/\.[^.]+$/, '');
+            const lang = slugLang(stem);
+            const text = await readFileAsText(f);
+            const parsed = buildLocFromFlatJSON(JSON.parse(text), lang);
+            state.project.localization.files.push({
+                id: uid('loc'), name: f.name, format: 'json',
+                languages: parsed.languages, keys: parsed.keys, data: parsed.data, raw: text, singleLang: true
+            });
+            ok++;
+        } catch (e) { toast('Failed to parse ' + f.name + ': ' + e.message, 'err', 5000); }
+    }
+    if (ok) { commit(); toast(ok + ' language file(s) loaded', 'ok'); openLocManager(); }
+}
+/* Recursively collect files from a FileSystemDirectoryEntry. */
+function readDirEntry(dirEntry) {
+    return new Promise(res => {
+        const reader = dirEntry.createReader();
+        const all = [];
+        const read = () => reader.readEntries(async entries => {
+            if (!entries.length) { res(all); return; }
+            for (const e of entries) {
+                if (e.isDirectory) { const sub = await readDirEntry(e); all.push(...sub); }
+                else all.push(await new Promise((r, j) => e.file(r, j)));
+            }
+            read();
+        });
+        read();
+    });
+}
+async function getLocFilesFromTransfer(dt) {
+    const files = [];
+    if (dt.items) {
+        for (const item of Array.from(dt.items)) {
+            const entry = item.webkitGetAsEntry && item.webkitGetAsEntry();
+            if (entry) {
+                if (entry.isDirectory) files.push(...(await readDirEntry(entry)));
+                else files.push(await new Promise((r, j) => entry.file(r, j)));
+            } else { const f = item.getAsFile(); if (f) files.push(f); }
+        }
+    } else files.push(...Array.from(dt.files));
+    return files.filter(f => /\.(json|csv)$/i.test(f.name));
+}
+
+/* Single smart import: auto-detects CSV, single-lang JSON, multi-lang JSON. */
+async function smartImportLoc(fileList) {
+    const files = Array.from(fileList).filter(f => /\.(json|csv)$/i.test(f.name));
+    if (!files.length) { toast('No JSON or CSV files found', 'warn'); return; }
+    let ok = 0;
+    for (const f of files) {
+        try {
+            const lf = await importLocFile(f);
+            // mark single-language result for inline re-labeling in the table
+            if (lf.format === 'json' && lf.languages.length === 1) lf.singleLang = true;
+            state.project.localization.files.push(lf);
+            ok++;
+        } catch (e) { toast('Failed: ' + f.name + ' — ' + e.message, 'err', 5000); }
+    }
+    if (ok) { commit(); toast(ok + ' file(s) loaded', 'ok'); openLocManager(); }
+}
+
+/* Re-map a single-language file to a different language code. */
+function setLocFileLanguage(fileId, newLang) {
+    newLang = slugLang(newLang);
+    const f = state.project.localization.files.find(x => x.id === fileId);
+    if (!f || f.languages.length !== 1) return;
+    const old = f.languages[0];
+    if (old === newLang) return;
+    for (const k of f.keys) {
+        if (f.data[k] && old in f.data[k]) { f.data[k][newLang] = f.data[k][old]; delete f.data[k][old]; }
+    }
+    f.languages = [newLang];
+    commit(); refreshAll(); openLocManager();
+}
+function removeLocFile(id) {
+    state.project.localization.files = state.project.localization.files.filter(f => f.id !== id);
+    commit(); refreshAll(); openLocManager();
+}
+async function replaceLocFile(id) {
+    const files = await pickFiles('.json,.csv', false);
+    if (!files || !files[0]) return;
+    try {
+        const lf = await importLocFile(files[0]); lf.id = id;
+        const i = state.project.localization.files.findIndex(f => f.id === id);
+        state.project.localization.files[i] = lf;
+        commit(); openLocManager(); toast('Replaced', 'ok');
+    } catch (e) { toast('Parse error: ' + e.message, 'err', 5000); }
+}
+
+function openLocManager() {
+    const files = state.project.localization.files;
+    const langs = langList();
+    const totalKeys = allLocKeys().length;
+
+    const table = el('table', { class: 'data' });
+    table.append(el('tr', {}, el('th', { text: 'File' }), el('th', { text: 'Type' }), el('th', { text: 'Languages' }), el('th', { text: 'Keys' }), el('th', { text: '' })));
+    if (!files.length) {
+        table.append(el('tr', {}, el('td', { colspan: 5, class: 'mini', text: 'No localization files loaded yet.' })));
+    } else for (const f of files) {
+        let langCell;
+        if (f.languages.length === 1) {
+            const inp = el('input', { class: 'lang-edit', type: 'text', value: f.languages[0], title: 'Language code — edit to re-map this file' });
+            inp.addEventListener('change', () => setLocFileLanguage(f.id, inp.value));
+            inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); e.stopPropagation(); });
+            langCell = el('div', { class: 'ctl' }, inp);
+        } else {
+            langCell = el('div', {}, ...f.languages.map(l => el('span', { class: 'tag', text: l })));
+        }
+        const actions = el('div', { class: 'ctl' },
+            el('button', { text: 'Replace', onclick: () => replaceLocFile(f.id) }),
+            el('button', { class: 'danger', text: 'Remove', onclick: () => removeLocFile(f.id) }));
+        table.append(el('tr', {}, el('td', { text: f.name }), el('td', { text: f.format.toUpperCase() }), el('td', {}, langCell), el('td', { text: f.keys.length }), el('td', {}, actions)));
+    }
+
+    const help = el('div', { class: 'help', style: 'margin-top:14px' });
+    help.innerHTML = 'Supported JSON shapes:<br>' +
+        '<b>A)</b> <code>{ "play": { "en": "Play", "tr": "Oyna" } }</code><br>' +
+        '<b>B)</b> <code>{ "en": { "play": "Play" }, "tr": { "play": "Oyna" } }</code><br>' +
+        '<b>Per-language file</b> (＋ Language JSON): <code>{ "play": "Play", "settings": "Settings" }</code> — one file = one language. ' +
+        'The language code is taken from the filename (e.g. <code>en.json</code>); edit it inline in the table to change it.<br>' +
+        'CSV: first column = key, remaining columns = language codes (header row).';
+
+    const summary = el('div', { class: 'mini', style: 'margin:6px 0 12px' }, `${files.length} file(s) · ${langs.length} language(s) [${langs.join(', ') || '—'}] · ${totalKeys} unique key(s)`);
+
+    const dropHint = el('div', { class: 'help', style: 'border:1.5px dashed var(--border);border-radius:var(--radius);padding:10px 14px;text-align:center;margin-bottom:12px;transition:border-color .15s', text: 'Drop JSON / CSV files or a folder here, or use the button below' });
+    const body = el('div', {},
+        dropHint,
+        el('div', { class: 'ctl', style: 'margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px' },
+            el('button', { class: 'primary', text: '＋ Import Localization', title: 'Import JSON (single-lang or multi-lang) or CSV — auto-detected', onclick: async () => smartImportLoc(await pickFiles('.json,.csv', true)) }),
+            el('button', { text: '⬇ Sample JSON', onclick: downloadSampleJSON }),
+            el('button', { text: '⬇ Sample Language', title: 'Download a single-language JSON example (en.json)', onclick: downloadSampleLangJSON }),
+            el('button', { text: '⬇ Sample CSV', onclick: downloadSampleCSV })),
+        summary, table, help);
+
+    // wire drop zone on the modal body
+    dropHint.addEventListener('dragover', (e) => { e.preventDefault(); dropHint.style.borderColor = 'var(--primary-color)'; dropHint.style.background = 'var(--surface-2)'; });
+    dropHint.addEventListener('dragleave', () => { dropHint.style.borderColor = ''; dropHint.style.background = ''; });
+    dropHint.addEventListener('drop', async (e) => {
+        e.preventDefault(); dropHint.style.borderColor = ''; dropHint.style.background = '';
+        const files = await getLocFilesFromTransfer(e.dataTransfer);
+        if (files.length) smartImportLoc(files); else toast('No JSON or CSV files found in drop', 'warn');
+    });
+
+    openModal($('#modal-loc'), 'Localization Manager', body, [el('button', { text: 'Close', onclick: () => closeModal($('#modal-loc')) })], 'lg');
+}
+
+function downloadSampleJSON() {
+    const sample = {
+        play: { en: 'Play', tr: 'Oyna', de: 'Spielen', ja: 'プレイ' },
+        settings: { en: 'Settings', tr: 'Ayarlar', de: 'Einstellungen', ja: '設定' },
+        quit: { en: 'Quit', tr: 'Çıkış', de: 'Beenden', ja: '終了' },
+        high_score: { en: 'High Score', tr: 'En Yüksek Skor', de: 'Highscore', ja: 'ハイスコア' }
+    };
+    downloadBlob(new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' }), 'sample_localization.json');
+}
+function downloadSampleCSV() {
+    const csv = 'key,en,tr,de,ja\n' +
+        'play,Play,Oyna,Spielen,プレイ\n' +
+        'settings,Settings,Ayarlar,Einstellungen,設定\n' +
+        'quit,Quit,Çıkış,Beenden,終了\n' +
+        '"high_score","High Score","En Yüksek Skor","Highscore","ハイスコア"\n';
+    downloadBlob(new Blob([csv], { type: 'text/csv' }), 'sample_localization.csv');
+}
+function downloadSampleLangJSON() {
+    // single-language file: one flat { key: value } map; language comes from the filename
+    const sample = { play: 'Play', settings: 'Settings', quit: 'Quit', high_score: 'High Score' };
+    downloadBlob(new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' }), 'en.json');
+}
+
+async function importFonts(fileList) {
+    let ok = 0;
+    for (const f of Array.from(fileList)) {
+        if (!/\.(ttf|otf)$/i.test(f.name)) { toast('Skipped (not TTF/OTF): ' + f.name, 'warn'); continue; }
+        const data = await readFileAsDataURL(f);
+        const id = uid('font');
+        state.project.assets.fonts[id] = { name: f.name.replace(/\.[^.]+$/, ''), file: f.name, data, format: /\.otf$/i.test(f.name) ? 'opentype' : 'truetype' };
+        await registerFont(id, state.project.assets.fonts[id]);
+        ok++;
+    }
+    if (ok) { recomputeFit(); commit(); toast(ok + ' font(s) imported', 'ok'); openFontManager(); }
+}
+function removeFont(id) {
+    delete state.project.assets.fonts[id];
+    delete state.fontFaces[id];
+    const fa = state.project.fontAssignment;
+    if (fa.global === id) fa.global = null;
+    for (const l in fa.perLanguage) if (fa.perLanguage[l] === id) delete fa.perLanguage[l];
+    for (const pg of state.project.pages) for (const o of pg.objects) if (o.type === 'text' && o.fontId === id) o.fontId = null;
+    commit(); openFontManager();
+}
+/* ----- Google Fonts (dynamic browse + download) -----
+   Index comes from the lightweight, CORS-enabled Fontsource catalog
+   (api.fontsource.org, ~0.5MB, filtered to Google fonts). The actual font
+   binaries are pulled straight from Google's own CDN via the css2 endpoint
+   (fonts.googleapis.com + fonts.gstatic.com, both send Access-Control-Allow-Origin:*),
+   so only the chosen family is downloaded — never the whole library. */
+let _gfList = null;
+async function loadGoogleFontsList() {
+    if (_gfList) return _gfList;
+    const res = await fetch('https://api.fontsource.org/v1/fonts');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const arr = await res.json();
+    _gfList = arr.filter(f => f.type === 'google')
+        .map(f => ({ id: f.id, family: f.family, category: f.category || '', weights: (f.weights && f.weights.length) ? f.weights : [400], subsets: f.subsets || [] }))
+        .sort((a, b) => a.family.localeCompare(b.family));
+    return _gfList;
+}
+async function fetchGoogleCss(family, weight) {
+    const base = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(family).replace(/%20/g, '+');
+    let r = await fetch(base + (weight && weight !== 400 ? ':wght@' + weight : ''));
+    if (!r.ok && weight && weight !== 400) r = await fetch(base); // fall back to default weight
+    if (!r.ok) throw new Error('Google CSS request failed (' + r.status + ')');
+    return r.text();
+}
+/* Already downloaded this family+weight? Return its asset id so we skip re-fetching. */
+function findGoogleFontAsset(family, weight) {
+    const fonts = state.project.assets.fonts;
+    const w = weight || 400;
+    for (const id in fonts) {
+        const f = fonts[id];
+        if (f.source === 'google' && f.family === family && (f.weight || 400) === w) return id;
+    }
+    return null;
+}
+async function downloadGoogleFont(entry, weight) {
+    const existing = findGoogleFontAsset(entry.family, weight);
+    if (existing) return existing; // already in the project — no need to download again
+    const css = await fetchGoogleCss(entry.family, weight);
+    const subsets = [];
+    for (const block of css.split('@font-face')) {
+        const m = block.match(/url\((https:\/\/[^)]+?\.woff2)\)/i);
+        if (!m) continue;
+        const ur = block.match(/unicode-range:\s*([^;]+);/i);
+        subsets.push({ url: m[1], unicodeRange: ur ? ur[1].trim() : null });
+    }
+    if (!subsets.length) throw new Error('No downloadable font files found for this family.');
+    const subAssets = [];
+    for (const s of subsets) {
+        const r = await fetch(s.url);
+        if (!r.ok) throw new Error('Font file fetch failed (' + r.status + ')');
+        subAssets.push({ data: arrayBufferToDataURL(await r.arrayBuffer(), 'font/woff2'), unicodeRange: s.unicodeRange });
+    }
+    const id = uid('font');
+    state.project.assets.fonts[id] = {
+        name: entry.family + (weight && weight !== 400 ? ' ' + weight : ''),
+        file: entry.family, source: 'google', family: entry.family, weight: weight || 400,
+        format: 'woff2', subsets: subAssets
+    };
+    await registerFont(id, state.project.assets.fonts[id]);
+    recomputeFit(); commit();
+    // if the font manager is currently open, refresh it so the new font appears immediately
+    if ($('#modal-font').classList.contains('open')) openFontManager();
+    return id;
+}
+function gfRow(entry) {
+    const meta = el('div', { class: 'gf-meta' },
+        el('span', { class: 'gf-fam', text: entry.family }),
+        el('span', { class: 'gf-cat', text: entry.category + ' · ' + entry.subsets.slice(0, 4).join(', ') }));
+    const wsel = el('select', { class: 'gf-w', title: 'Weight' });
+    for (const w of entry.weights) wsel.append(el('option', { value: w }, String(w)));
+    wsel.value = String(entry.weights.includes(400) ? 400 : entry.weights[0]);
+    const dl = el('button', { class: 'primary', text: 'Download' });
+    // reflect whether this exact family+weight is already in the project
+    const syncState = () => {
+        if (findGoogleFontAsset(entry.family, parseInt(wsel.value, 10))) { dl.disabled = true; dl.textContent = '✓ Added'; }
+        else { dl.disabled = false; dl.textContent = 'Download'; }
+    };
+    wsel.addEventListener('change', syncState);
+    dl.addEventListener('click', async () => {
+        dl.disabled = true; dl.textContent = '…';
+        try {
+            await downloadGoogleFont(entry, parseInt(wsel.value, 10));
+            toast('Added ' + entry.family, 'ok'); dl.textContent = '✓ Added';
+        } catch (e) { console.error(e); toast('Download failed: ' + e.message, 'err', 6000); syncState(); }
+    });
+    syncState();
+    return el('div', { class: 'gf-row' }, meta, wsel, dl);
+}
+function openGoogleFontsPanel() {
+    const search = el('input', { type: 'text', placeholder: 'Search Google Fonts (e.g. Roboto, Noto Sans JP)…', style: 'width:100%' });
+    const status = el('div', { class: 'mini', style: 'margin:8px 0' }, 'Loading font catalog…');
+    const listEl = el('div', { class: 'gf-list' });
+    const body = el('div', {}, search, status, listEl);
+    openModal($('#modal-generic'), '🌐 Google Fonts', body,
+        [el('button', { text: 'Close', onclick: () => closeModal($('#modal-generic')) })], 'lg');
+
+    let all = [];
+    const LIMIT = 60;
+    function render() {
+        const q = search.value.trim().toLowerCase();
+        listEl.innerHTML = '';
+        const items = q ? all.filter(f => f.family.toLowerCase().includes(q) || f.category.includes(q)) : all;
+        for (const f of items.slice(0, LIMIT)) listEl.append(gfRow(f));
+        if (!items.length) listEl.append(el('div', { class: 'mini', style: 'padding:10px', text: 'No matches.' }));
+        else if (items.length > LIMIT) listEl.append(el('div', { class: 'mini', style: 'padding:10px', text: 'Showing first ' + LIMIT + ' of ' + items.length + ' — type to narrow the list.' }));
+    }
+    search.addEventListener('input', render);
+    loadGoogleFontsList().then(list => {
+        all = list; status.textContent = list.length + ' families available · type to search, then Download to add.';
+        render();
+    }).catch(e => {
+        status.innerHTML = '';
+        const hint = (location.protocol === 'file:') ? ' Tip: open this tool over http:// (the bundled local server) — file:// blocks network requests.' : '';
+        status.append(el('div', { class: 'mini', style: 'color:var(--danger)', text: 'Could not load the font list: ' + e.message + '.' + hint }));
+    });
+    setTimeout(() => search.focus(), 40);
+}
+
+function openFontManager() {
+    const fonts = state.project.assets.fonts;
+    const ids = Object.keys(fonts);
+    const langs = langList();
+
+    const table = el('table', { class: 'data' });
+    table.append(el('tr', {}, el('th', { text: 'Font' }), el('th', { text: 'Preview' }), el('th', { text: 'Glyphs' }), el('th', { text: '' })));
+    if (!ids.length) table.append(el('tr', {}, el('td', { colspan: 4, class: 'mini', text: 'No fonts imported.' })));
+    else for (const id of ids) {
+        const fam = state.fontFaces[id] ? state.fontFaces[id].family : '';
+        const cov = state.fontFaces[id] && state.fontFaces[id].coverage;
+        const glyphs = cov ? (cov.set.size + (cov.ranges.length ? '+ranges' : '')) : (fonts[id].source === 'google' ? 'web' : '—');
+        const prev = el('span', { style: 'font-family:"' + fam + '";font-size:20px', text: 'AaBb Çğ あ 漢 123' });
+        table.append(el('tr', {},
+            el('td', { text: fonts[id].name }),
+            el('td', {}, prev),
+            el('td', { text: glyphs }),
+            el('td', {}, el('button', { class: 'danger', text: 'Remove', onclick: () => removeFont(id) }))));
+    }
+
+    const globalSel = bindFontAssign('global');
+    const perRows = el('div', {});
+    if (!langs.length) perRows.append(el('div', { class: 'mini', text: 'Load localization files to assign fonts per language.' }));
+    else for (const l of langs) perRows.append(row(l, bindFontAssign(l)));
+
+    const body = el('div', {},
+        el('div', { class: 'ctl', style: 'margin-bottom:12px' },
+            el('button', { class: 'primary', text: '＋ Import TTF / OTF', onclick: async () => importFonts(await pickFiles('.ttf,.otf', true)) }),
+            el('button', { class: 'primary', text: '🌐 Google Fonts', title: 'Browse and download fonts from Google Fonts', onclick: openGoogleFontsPanel })),
+        table,
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: 'Font Assignment' })),
+        row('Global', globalSel),
+        el('div', { class: 'mini', style: 'margin:4px 0 10px' }, 'Per-language fonts override the global and per-object font (useful for CJK, etc.).'),
+        perRows);
+    openModal($('#modal-font'), 'Font Manager', body, [el('button', { text: 'Close', onclick: () => closeModal($('#modal-font')) })], 'lg');
+}
+function bindFontAssign(scope) {
+    const fa = state.project.fontAssignment;
+    const sel = el('select');
+    sel.append(el('option', { value: '' }, scope === 'global' ? '— none —' : '— inherit —'));
+    for (const id in state.project.assets.fonts) sel.append(el('option', { value: id }, state.project.assets.fonts[id].name));
+    sel.value = (scope === 'global' ? fa.global : fa.perLanguage[scope]) || '';
+    sel.addEventListener('change', () => {
+        const v = sel.value || null;
+        if (scope === 'global') fa.global = v;
+        else { if (v) fa.perLanguage[scope] = v; else delete fa.perLanguage[scope]; }
+        commit();
+    });
+    return sel;
+}
+
+/* ------------------------------ Export ---------------------------------- */
+const FORMAT_INFO = { png: { mime: 'image/png', ext: 'png', lossy: false }, jpg: { mime: 'image/jpeg', ext: 'jpg', lossy: true }, webp: { mime: 'image/webp', ext: 'webp', lossy: true } };
+function slug(s) { return String(s).trim().toLowerCase().replace(/[^a-z0-9._-]+/g, '_').replace(/^_+|_+$/g, '') || 'page'; }
+
+function toBlobAsync(canvas, mime, quality) {
+    return new Promise((res) => canvas.toBlob((b) => res(b), mime, quality));
+}
+async function renderPageToBlob(page, lang, fmt, quality) {
+    const res = pageResolution(page);
+    const c = document.createElement('canvas'); c.width = res.width; c.height = res.height;
+    const ctx = c.getContext('2d');
+    const bgFallback = (fmt.mime === 'image/jpeg' && !page.bgOn) ? '#ffffff' : null;
+    renderPageToCtx(ctx, page, lang, { bgFallback });
+    const blob = await toBlobAsync(c, fmt.mime, quality);
+    return new Uint8Array(await blob.arrayBuffer());
+}
+
+function exportFilename(pageName, lang, withSuffix, fmtExt) {
+    const base = slug(pageName);
+    const suff = (withSuffix && lang && lang !== '__key') ? '_' + lang : '';
+    return base + suff + '.' + fmtExt;
+}
+
+function openExportWizard() {
+    const langs = langList();
+    const es = state.project.exportSettings;
+
+    // format radios
+    const fmtWrap = el('div', { class: 'radio-card' });
+    const fmtRadios = [];
+    for (const k of ['png', 'jpg', 'webp']) {
+        const lab = el('label', {},
+            el('input', { type: 'radio', name: 'exp-fmt', value: k }),
+            el('div', { class: 'rc-body' }, el('div', { class: 'rc-title', text: k.toUpperCase() }), el('div', { class: 'rc-desc', text: k === 'png' ? 'Lossless, alpha' : (k === 'jpg' ? 'Small, no alpha' : 'Small, alpha') })));
+        const radio = lab.querySelector('input'); if (es.format === k) radio.checked = true;
+        radio.addEventListener('change', updateQualityVis);
+        fmtRadios.push(radio);
+        fmtWrap.append(lab);
+    }
+    if (!fmtRadios.some(r => r.checked)) fmtRadios[0].checked = true;
+    const quality = el('input', { type: 'range', min: 0.3, max: 1, step: 0.01, value: es.quality });
+    const qBadge = el('span', { class: 'val-badge', text: Math.round(es.quality * 100) + '%' });
+    quality.addEventListener('input', () => qBadge.textContent = Math.round(quality.value * 100) + '%');
+    const qualityRow = el('div', { class: 'row' }, el('label', { text: 'Quality' }), el('div', { class: 'ctl' }, quality, qBadge));
+
+    // naming
+    const suffixChk = el('input', { type: 'checkbox' }); suffixChk.checked = es.naming === 'suffix';
+    // organization
+    const orgWrap = el('div', { class: 'radio-card' });
+    const orgRadios = [];
+    for (const [val, title, desc] of [['flat', 'Flat', 'title_en.png\ntitle_tr.png'], ['folders', 'Folders per language', 'en/title.png\ntr/title.png']]) {
+        const lab = el('label', {}, el('input', { type: 'radio', name: 'exp-org', value: val }),
+            el('div', { class: 'rc-body' }, el('div', { class: 'rc-title', text: title }), el('div', { class: 'rc-desc', style: 'white-space:pre-line', text: desc })));
+        const orad = lab.querySelector('input'); if (es.organize === val) orad.checked = true;
+        orad.addEventListener('change', updateExample);
+        orgRadios.push(orad);
+        orgWrap.append(lab);
+    }
+    if (!orgRadios.some(r => r.checked)) orgRadios[0].checked = true;
+    suffixChk.addEventListener('change', updateExample);
+
+    // languages
+    const langWrap = el('div', { class: 'lang-pick' });
+    const langChecks = {};
+    if (!langs.length) langWrap.append(el('div', { class: 'mini', text: 'No languages loaded — a single key-preview image per page will be exported.' }));
+    else {
+        const allBtn = el('button', { text: 'All', onclick: () => { langs.forEach(l => langChecks[l].checked = true); updateExample(); } });
+        const noneBtn = el('button', { text: 'None', onclick: () => { langs.forEach(l => langChecks[l].checked = false); updateExample(); } });
+        langWrap.append(allBtn, noneBtn);
+        const selected = es.languages;
+        for (const l of langs) {
+            const c = el('input', { type: 'checkbox' }); c.checked = !selected || selected.includes(l);
+            c.addEventListener('change', updateExample);
+            langChecks[l] = c;
+            langWrap.append(el('label', {}, c, ' ' + l));
+        }
+    }
+
+    // pages
+    const pageWrap = el('div', { class: 'lang-pick' });
+    const pageChecks = {};
+    state.project.pages.forEach(pg => {
+        const c = el('input', { type: 'checkbox' }); c.checked = true; pageChecks[pg.id] = c;
+        c.addEventListener('change', updateExample);
+        pageWrap.append(el('label', {}, c, ' ' + pg.name));
+    });
+
+    const example = el('div', { class: 'mini', style: 'margin-top:8px;white-space:pre-line;color:var(--accent-color)' });
+    const progress = el('div', { class: 'progress', style: 'display:none' }, el('div'));
+
+    function curFmt() { return (fmtRadios.find(r => r.checked) || fmtRadios[0]).value; }
+    function curOrg() { return (orgRadios.find(r => r.checked) || orgRadios[0]).value; }
+    function updateQualityVis() { qualityRow.style.display = FORMAT_INFO[curFmt()].lossy ? '' : 'none'; updateExample(); }
+    function selectedLangs() { return langs.length ? langs.filter(l => langChecks[l].checked) : ['__key']; }
+    function updateExample() {
+        const fmt = FORMAT_INFO[curFmt()];
+        const org = curOrg();
+        const sl = selectedLangs();
+        const firstPage = state.project.pages.find(p => pageChecks[p.id].checked);
+        if (!firstPage || !sl.length) { example.textContent = 'Nothing selected to export.'; return; }
+        // collision guard: flat + no suffix + multiple langs
+        const lang = sl[0];
+        const withSuffix = suffixChk.checked || (org === 'flat' && sl.length > 1);
+        const fn = exportFilename(firstPage.name, lang, withSuffix, fmt.ext);
+        const path = (org === 'folders' && lang !== '__key' ? lang + '/' : '') + fn;
+        const count = sl.length * state.project.pages.filter(p => pageChecks[p.id].checked).length;
+        example.textContent = 'Example: ' + path + '\n' + count + ' image(s) → ' + slug(state.project.name) + '_export.zip';
+    }
+    updateQualityVis();
+
+    const body = el('div', {},
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:0 0 6px' }, el('span', { text: '1 · Format' })), fmtWrap, qualityRow,
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '2 · Naming' })),
+        el('label', { class: 'help', style: 'display:flex;align-items:center;gap:8px' }, suffixChk, ' Append language code to filename (', el('code', { text: 'title_en.png' }), ')'),
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '3 · Language organization' })), orgWrap,
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '4 · Languages' })), langWrap,
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '5 · Pages' })), pageWrap,
+        example, progress);
+
+    const runBtn = el('button', { class: 'primary', text: '⬇ Export ZIP' });
+    runBtn.addEventListener('click', async () => {
+        const fmtKey = curFmt(); const fmt = FORMAT_INFO[fmtKey]; const org = curOrg();
+        const sl = selectedLangs();
+        const pages = state.project.pages.filter(p => pageChecks[p.id].checked);
+        if (!pages.length || !sl.length) { toast('Select at least one page and language', 'warn'); return; }
+        const withSuffix = suffixChk.checked || (org === 'flat' && sl.length > 1);
+        // persist settings
+        es.format = fmtKey; es.quality = parseFloat(quality.value); es.naming = suffixChk.checked ? 'suffix' : 'plain';
+        es.organize = org; es.languages = langs.length ? sl.slice() : null;
+
+        runBtn.disabled = true; progress.style.display = '';
+        const bar = progress.firstChild;
+        const total = pages.length * sl.length; let done = 0;
+        const files = []; const seen = new Set();
+        try {
+            for (const pg of pages) {
+                for (const lang of sl) {
+                    const data = await renderPageToBlob(pg, lang, fmt, es.quality);
+                    let name = exportFilename(pg.name, lang, withSuffix, fmt.ext);
+                    let path = (org === 'folders' && lang !== '__key' ? slug(lang) + '/' : '') + name;
+                    if (seen.has(path)) { path = path.replace('.' + fmt.ext, '_' + slug(pg.id).slice(-4) + '.' + fmt.ext); }
+                    seen.add(path);
+                    files.push({ name: path, data });
+                    done++; bar.style.width = Math.round(done / total * 100) + '%';
+                    await new Promise(r => setTimeout(r, 0)); // yield for UI
+                }
+            }
+            const zip = buildZip(files);
+            downloadBlob(zip, slug(state.project.name) + '_export.zip');
+            toast('Exported ' + files.length + ' image(s)', 'ok');
+            closeModal($('#modal-export'));
+        } catch (e) {
+            console.error(e); toast('Export failed: ' + e.message, 'err', 6000);
+            runBtn.disabled = false;
+        }
+    });
+
+    openModal($('#modal-export'), 'Export Wizard', body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-export')) }), runBtn]);
+}
+
+/* ---------------------------- Project I/O ------------------------------- */
+function loadProject(proj, opts = {}) {
+    proj = migrateProject(proj);
+    state.project = proj;
+    state.pageId = proj.pages[0] ? proj.pages[0].id : null;
+    state.selection = [];
+    state.imageCache = {}; state.fontFaces = {};
+    ensureAssetsLoaded();
+    initHistory();
+    refreshAll();
+    fitToScreen();
+    state.dirty = false;
+    if (!opts.silent) toast('Project loaded: ' + proj.name, 'ok');
+}
+function migrateProject(p) {
+    if (!p || typeof p !== 'object') throw new Error('Invalid project file');
+    p.version = p.version || 1;
+    p.name = p.name || 'Untitled';
+    p.defaultResolution = p.defaultResolution || { width: 1920, height: 1080 };
+    p.assets = p.assets || { images: {}, fonts: {} };
+    p.assets.images = p.assets.images || {};
+    p.assets.fonts = p.assets.fonts || {};
+    p.localization = p.localization || { files: [] };
+    p.localization.files = p.localization.files || [];
+    p.fontAssignment = p.fontAssignment || { global: null, perLanguage: {} };
+    p.fontAssignment.perLanguage = p.fontAssignment.perLanguage || {};
+    p.exportSettings = p.exportSettings || { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null };
+    if (!Array.isArray(p.pages) || !p.pages.length) p.pages = [newPage('Page 1', 1920, 1080)];
+    for (const pg of p.pages) {
+        pg.id = pg.id || uid('page');
+        pg.objects = pg.objects || [];
+        if (!('bgOn' in pg)) pg.bgOn = false;
+        if (!('bg' in pg)) pg.bg = '#1e1e22';
+        for (const o of pg.objects) o.id = o.id || uid('obj');
+    }
+    return p;
+}
+function saveProject() {
+    const data = JSON.stringify(state.project);
+    const fname = slug(state.project.name) + '.licproj';
+    downloadBlob(new Blob([data], { type: 'application/json' }), fname);
+    state.dirty = false; updateStatus();
+    toast('Saved ' + fname, 'ok');
+}
+async function openProjectFile() {
+    const files = await pickFiles('.licproj,.json', false);
+    if (!files || !files[0]) return;
+    try {
+        const text = await readFileAsText(files[0]);
+        const proj = JSON.parse(text);
+        loadProject(proj);
+    } catch (e) { toast('Could not open project: ' + e.message, 'err', 6000); }
+}
+function newProjectAction() {
+    if (state.dirty && !confirm('Start a new project? Unsaved changes will be lost (autosave is kept until you change the new project).')) return;
+    loadProject(newProject(), { silent: true });
+    state.project.name = 'Untitled';
+    toast('New project created', 'ok');
+}
+function renameProjectPrompt() {
+    const inp = el('input', { type: 'text', value: state.project.name, style: 'width:100%' });
+    const body = el('div', {}, el('label', { class: 'mini', text: 'Project name (used for export/zip filenames)' }), inp);
+    const save = el('button', { class: 'primary', text: 'Save', onclick: () => { state.project.name = inp.value.trim() || 'Untitled'; closeModal($('#modal-generic')); commit(); } });
+    openModal($('#modal-generic'), 'Project Name', body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-generic')) }), save], 'sm');
+    setTimeout(() => { inp.focus(); inp.select(); }, 30);
+}
+
+/* ---------------------------- Keyboard ---------------------------------- */
+function isTyping(t) {
+    return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+}
+function anyModalOpen() { return $$('.modal-back.open').length > 0; }
+
+function setupKeyboard() {
+    window.addEventListener('keydown', (e) => {
+        const mod = e.ctrlKey || e.metaKey;
+        if (e.code === 'Space' && !isTyping(e.target) && !state.spaceDown) {
+            state.spaceDown = true; $('#canvas-wrap').style.cursor = 'grab'; e.preventDefault(); return;
+        }
+        if (mod && e.key.toLowerCase() === 's') { e.preventDefault(); saveProject(); return; }
+        if (anyModalOpen()) { if (e.key === 'Escape') closeAllModals(); return; }
+        if (isTyping(e.target)) return;
+
+        if (mod && e.key.toLowerCase() === 'z' && !e.shiftKey) { e.preventDefault(); undo(); return; }
+        if (mod && (e.key.toLowerCase() === 'y' || (e.key.toLowerCase() === 'z' && e.shiftKey))) { e.preventDefault(); redo(); return; }
+        if (mod && e.key.toLowerCase() === 'c') { e.preventDefault(); copySelection(); return; }
+        if (mod && e.key.toLowerCase() === 'v') { e.preventDefault(); pasteClipboard(); return; }
+        if (mod && e.key.toLowerCase() === 'd') { e.preventDefault(); duplicateSelection(); return; }
+        if (mod && e.key.toLowerCase() === 'a') { e.preventDefault(); state.selection = curObjects().map(o => o.id); refreshSelectionUI(); return; }
+        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSelection(); return; }
+        if (e.key === 'Escape') { state.selection = []; refreshSelectionUI(); return; }
+        if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(state.zoom * 1.15); return; }
+        if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(state.zoom / 1.15); return; }
+        if (e.key.startsWith('Arrow') && state.selection.length) {
+            e.preventDefault();
+            const step = e.shiftKey ? 10 : 1;
+            const dx = e.key === 'ArrowLeft' ? -step : e.key === 'ArrowRight' ? step : 0;
+            const dy = e.key === 'ArrowUp' ? -step : e.key === 'ArrowDown' ? step : 0;
+            for (const o of selectedObjects()) if (!o.locked) { o.x += dx; o.y += dy; }
+            commit();
+        }
+    });
+    window.addEventListener('keyup', (e) => {
+        if (e.code === 'Space') { state.spaceDown = false; $('#canvas-wrap').style.cursor = ''; }
+    });
+}
+
+/* --------------------------- Panel resizers ----------------------------- */
+function setupResizers() {
+    const drag = (handle, dock, side) => {
+        handle.addEventListener('pointerdown', (e) => {
+            e.preventDefault(); handle.setPointerCapture(e.pointerId);
+            const startX = e.clientX, startW = dock.getBoundingClientRect().width;
+            const move = (ev) => {
+                const dx = ev.clientX - startX;
+                let w = side === 'left' ? startW + dx : startW - dx;
+                w = clamp(w, 200, 560);
+                dock.style.width = w + 'px';
+                renderSelectionOverlay();
+            };
+            const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
+            window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+        });
+    };
+    drag($('#resize-left'), $('#left-dock'), 'left');
+    drag($('#resize-right'), $('#right-dock'), 'right');
+}
+
+/* --------------------------- Canvas drop -------------------------------- */
+function setupCanvasDrop() {
+    const wrap = $('#canvas-wrap');
+    wrap.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'copy'; });
+    wrap.addEventListener('drop', async (e) => {
+        e.preventDefault();
+        const p = screenToCanvas(e.clientX, e.clientY);
+        const assetId = e.dataTransfer.getData('application/x-lic-asset');
+        if (assetId && state.project.assets.images[assetId]) {
+            placeImageAt(assetId, p); return;
+        }
+        if (e.dataTransfer.files && e.dataTransfer.files.length) {
+            const before = Object.keys(state.project.assets.images);
+            await importAssets(e.dataTransfer.files);
+            const after = Object.keys(state.project.assets.images).filter(id => !before.includes(id));
+            if (after.length) placeImageAt(after[0], p);
+        }
+    });
+}
+function placeImageAt(assetId, p) {
+    const im = state.imageCache[assetId];
+    let w = 400, h = 400;
+    if (im && im.naturalWidth) {
+        const res = pageResolution();
+        const sc = Math.min(1, (res.width * 0.5) / im.naturalWidth, (res.height * 0.5) / im.naturalHeight);
+        w = Math.round(im.naturalWidth * sc); h = Math.round(im.naturalHeight * sc);
+    }
+    const o = newImageObject(Math.round(p.x - w / 2), Math.round(p.y - h / 2), assetId, w, h);
+    o.name = state.project.assets.images[assetId].name.replace(/\.[^.]+$/, '');
+    addObject(o);
+}
+
+/* ------------------------------- Init ----------------------------------- */
+function setupDockTabs() {
+    $$('.dock-tab').forEach(tab => tab.addEventListener('click', () => {
+        $$('.dock-tab').forEach(t => t.classList.toggle('active', t === tab));
+        const which = tab.dataset.dock;
+        $('#panel-layers').classList.toggle('active', which === 'layers');
+        $('#panel-assets').classList.toggle('active', which === 'assets');
+    }));
+}
+
+function setupToolbar() {
+    $('#btn-new').onclick = newProjectAction;
+    $('#btn-open').onclick = openProjectFile;
+    $('#btn-save').onclick = saveProject;
+    $('#btn-undo').onclick = undo;
+    $('#btn-redo').onclick = redo;
+    $('#btn-add-text').onclick = addText;
+    $('#btn-add-image').onclick = () => addImage();
+    $('#btn-add-rect').onclick = addRect;
+    $('#btn-zoom-in').onclick = () => setZoom(state.zoom * 1.15);
+    $('#btn-zoom-out').onclick = () => setZoom(state.zoom / 1.15);
+    $('#btn-zoom-fit').onclick = fitToScreen;
+    $('#btn-grid').onclick = () => { state.grid = !state.grid; $('#btn-grid').classList.toggle('on', state.grid); renderCanvas(); };
+    $('#btn-snap').onclick = () => { state.snap = !state.snap; $('#btn-snap').classList.toggle('on', state.snap); };
+    const gsz = $('#grid-size'); gsz.value = state.gridSize;
+    gsz.addEventListener('input', () => {
+        let v = parseInt(gsz.value, 10); if (isNaN(v)) return;
+        state.gridSize = Math.max(2, Math.min(512, v));
+        if (state.grid) renderCanvas();
+    });
+    gsz.addEventListener('change', () => { gsz.value = state.gridSize; });
+    $('#btn-loc').onclick = openLocManager;
+    $('#btn-fonts').onclick = openFontManager;
+    $('#btn-export').onclick = openExportWizard;
+
+    $('#lyr-up').onclick = () => moveLayer('up');
+    $('#lyr-down').onclick = () => moveLayer('down');
+    $('#lyr-dup').onclick = duplicateSelection;
+    $('#asset-import').onclick = async () => importAssets(await pickFiles('image/*', true));
+
+    $('#preview-lang').addEventListener('change', (e) => { state.previewLang = e.target.value; renderCanvas(); renderInspector(); });
+    $('#btn-page-res').onclick = openResolutionEditor;
+    $('#page-bg').addEventListener('input', (e) => { curPage().bg = e.target.value; requestCanvas(); });
+    $('#page-bg').addEventListener('change', () => commit());
+    $('#page-bg-on').addEventListener('change', (e) => { curPage().bgOn = e.target.checked; commit(); });
+    $('#sb-proj').style.cursor = 'pointer';
+    $('#sb-proj').title = 'Rename project';
+    $('#sb-proj').addEventListener('click', renameProjectPrompt);
+
+    const drop = $('#asset-drop');
+    drop.onclick = async () => importAssets(await pickFiles('image/*', true));
+    drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+    drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files.length) importAssets(e.dataTransfer.files); });
+}
+
+function tryRestoreAutosave() {
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null'); } catch (e) {}
+    if (saved && saved.project && saved.project.pages && saved.project.pages.length) {
+        const when = new Date(saved.savedAt || Date.now()).toLocaleString();
+        if (confirm('An autosaved project was found (' + when + ').\n\nOK = restore it, Cancel = start a new project.')) {
+            loadProject(saved.project, { silent: true });
+            toast('Autosave restored', 'ok');
+            return true;
+        }
+    }
+    return false;
+}
+
+function init() {
+    window.addEventListener('error', (e) => { console.error(e.error || e.message); });
+    setupDockTabs();
+    setupToolbar();
+    setupCanvasInteraction();
+    setupCanvasDrop();
+    setupKeyboard();
+    setupResizers();
+    window.addEventListener('resize', () => renderSelectionOverlay());
+    window.addEventListener('beforeunload', (e) => { if (state.dirty) { e.preventDefault(); e.returnValue = ''; } });
+
+    initHistory();
+    if (!tryRestoreAutosave()) {
+        ensureAssetsLoaded();
+        refreshAll();
+    }
+    fitToScreen();
+    toast('Welcome — add a layer, import localization, then Export.', '', 4000);
+    // Warm only the Google Fonts *list* up front (a single ~0.5MB catalog request).
+    // Font binaries are never fetched until the user clicks Download for a family.
+    loadGoogleFontsList().catch(() => {});
+}
+
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+else init();
+    </script>
+</body>
+
+</html>
