@@ -351,6 +351,7 @@
             <div class="tb-group">
                 <button id="btn-loc" title="Localization Manager">🌍 Localization</button>
                 <button id="btn-fonts" title="Font Manager">🅵 Fonts</button>
+                <button id="btn-legal" title="Legal &amp; license">⚖ Legal</button>
             </div>
             <div class="tb-group">
                 <button id="btn-export" class="primary" title="Export images">⬇ Export</button>
@@ -686,17 +687,36 @@ const FILL_TYPES = {
             row('Cell px', _fillNum(f, 'size', { min: 2, step: 1 }))
         ],
         paint: (ctx, f, x, y, w, h) => {
-            const s = Math.max(2, f.size || 32);
+            // Use a cached 2x2-cell tile pattern instead of looping every frame.
+            const pat = checkerPattern(ctx, f);
             ctx.save();
             ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
-            ctx.fillStyle = f.color1 || '#000'; ctx.fillRect(x, y, w, h);
-            ctx.fillStyle = f.color2 || '#fff';
-            const cols = Math.ceil(w / s), rows = Math.ceil(h / s);
-            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if ((r + c) & 1) ctx.fillRect(x + c * s, y + r * s, s, s);
+            ctx.translate(x, y);            // align tile origin with the fill rect
+            ctx.fillStyle = pat;
+            ctx.fillRect(0, 0, w, h);
             ctx.restore();
         }
     }
 };
+/* Cached checkerboard tiles: key "color1|color2|size" -> CanvasPattern.
+ * The pattern is a 2x2-cell tile, so it only rebuilds when the inputs change. */
+const _checkerTiles = new Map();
+function checkerPattern(ctx, f) {
+    const s = Math.max(2, Math.round(f.size || 32));
+    const c1 = f.color1 || '#000', c2 = f.color2 || '#fff';
+    const key = c1 + '|' + c2 + '|' + s;
+    let pat = _checkerTiles.get(key);
+    if (!pat) {
+        const tile = document.createElement('canvas');
+        tile.width = s * 2; tile.height = s * 2;
+        const tctx = tile.getContext('2d');
+        tctx.fillStyle = c1; tctx.fillRect(0, 0, s * 2, s * 2);
+        tctx.fillStyle = c2; tctx.fillRect(s, 0, s, s); tctx.fillRect(0, s, s, s);
+        pat = ctx.createPattern(tile, 'repeat');
+        _checkerTiles.set(key, pat);
+    }
+    return pat;
+}
 function paintFill(ctx, fill, x, y, w, h) {
     const f = fill || FILL_DEFAULTS;
     const t = FILL_TYPES[f.type] || FILL_TYPES.solid;
@@ -1274,6 +1294,31 @@ function composeNineSlice(obj, img, w, h) {
     return c;
 }
 
+/* Cached 9-slice composites: objId -> { key, canvas }. The composite (and its
+ * optional tint) is only rebuilt when an input that affects it changes, so the
+ * per-frame path becomes a single drawImage of an already-prepared canvas. */
+const _nsCache = new Map();
+function nineSliceCanvas(obj, img, w, h) {
+    const ns = obj.nineSlice || {};
+    const inner = obj.innerAssetId && state.imageCache[obj.innerAssetId];
+    const innerSig = inner ? (obj.innerAssetId + ':' + inner.naturalWidth + 'x' + inner.naturalHeight) : '';
+    const key = [
+        obj.assetId, img.naturalWidth, img.naturalHeight,
+        ns.left | 0, ns.top | 0, ns.right | 0, ns.bottom | 0,
+        Math.round(w), Math.round(h),
+        innerSig,
+        obj.tintEnabled ? 1 : 0, obj.tintEnabled ? (obj.tint || '') : ''
+    ].join('|');
+    let entry = _nsCache.get(obj.id);
+    if (!entry || entry.key !== key) {
+        let comp = composeNineSlice(obj, img, w, h);
+        if (obj.tintEnabled) comp = tintCanvasColor(comp, obj.tint);
+        entry = { key, canvas: comp };
+        _nsCache.set(obj.id, entry);
+    }
+    return entry.canvas;
+}
+
 function drawImageObject(ctx, obj) {
     const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
     const w = obj.width * (obj.scale || 1), h = obj.height * (obj.scale || 1);
@@ -1313,8 +1358,7 @@ function drawImageObject(ctx, obj) {
 
     ctx.filter = filterStr;
     if (obj.nineSlice && obj.nineSlice.enabled) {
-        let comp = composeNineSlice(obj, img, w, h);
-        if (obj.tintEnabled) comp = tintCanvasColor(comp, obj.tint);
+        const comp = nineSliceCanvas(obj, img, w, h);
         ctx.drawImage(comp, -w / 2, -h / 2, w, h);
     } else {
         const src = obj.tintEnabled ? tintImage(img, obj.tint) : img;
@@ -2155,15 +2199,13 @@ function fitStatus(o) {
     return div;
 }
 
-function nineSliceEditor(o) {
+/* Shared 9-slice editor box. Returns the draggable box element plus helpers so
+   both the inline inspector editor and the zoomable modal reuse one engine. */
+function makeNineSliceBox(o, img, asset, initialScale) {
     const ns = o.nineSlice;
-    const asset = o.assetId && state.project.assets.images[o.assetId];
-    const img = o.assetId && state.imageCache[o.assetId];
-    if (!asset || !img || !img.naturalWidth) return el('div', { class: 'mini', text: 'Assign a main asset above to edit 9-slice borders.' });
     const iw = img.naturalWidth, ih = img.naturalHeight;
-    const scale = Math.min(248 / iw, 220 / ih, 1);
-    const dispW = Math.max(1, Math.round(iw * scale)), dispH = Math.max(1, Math.round(ih * scale));
-    const box = el('div', { class: 'ns-box', style: `width:${dispW}px;height:${dispH}px` });
+    let scale = initialScale, dispW = 1, dispH = 1;
+    const box = el('div', { class: 'ns-box' });
     box.append(el('img', { src: asset.data, draggable: 'false' }));
     const center = el('div', { class: 'ns-center' }); box.append(center);
     const lines = {
@@ -2181,6 +2223,13 @@ function nineSliceEditor(o) {
         center.style.top = (ns.top * scale) + 'px';
         center.style.width = Math.max(0, dispW - (ns.left + ns.right) * scale) + 'px';
         center.style.height = Math.max(0, dispH - (ns.top + ns.bottom) * scale) + 'px';
+    }
+    function relayout(s) {
+        if (s != null) scale = s;
+        dispW = Math.max(1, Math.round(iw * scale));
+        dispH = Math.max(1, Math.round(ih * scale));
+        box.style.width = dispW + 'px'; box.style.height = dispH + 'px';
+        place();
     }
     function syncInputs() { for (const s in inputs) if (document.activeElement !== inputs[s]) inputs[s].value = ns[s]; }
     function bindLine(side) {
@@ -2201,7 +2250,6 @@ function nineSliceEditor(o) {
         });
     }
     for (const k in lines) bindLine(k);
-    place();
     function numField(side, label) {
         const i = el('input', { type: 'number', min: 0, value: ns[side] });
         i.addEventListener('input', () => { let v = Math.max(0, parseInt(i.value, 10) || 0); ns[side] = v; place(); requestCanvas(); });
@@ -2209,9 +2257,64 @@ function nineSliceEditor(o) {
         inputs[side] = i;
         return field(label, i);
     }
-    return el('div', {}, box,
-        el('div', { class: 'row2' }, numField('left', 'Left'), numField('right', 'Right')),
-        el('div', { class: 'row2' }, numField('top', 'Top'), numField('bottom', 'Bottom')));
+    relayout(scale);
+    return { box, relayout, place, syncInputs, numField, get iw() { return iw; }, get ih() { return ih; } };
+}
+
+function nineSliceEditor(o) {
+    const asset = o.assetId && state.project.assets.images[o.assetId];
+    const img = o.assetId && state.imageCache[o.assetId];
+    if (!asset || !img || !img.naturalWidth) return el('div', { class: 'mini', text: 'Assign a main asset above to edit 9-slice borders.' });
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const scale = Math.min(248 / iw, 220 / ih, 1);
+    const ed = makeNineSliceBox(o, img, asset, scale);
+    return el('div', {}, ed.box,
+        el('div', { class: 'row2' }, ed.numField('left', 'Left'), ed.numField('right', 'Right')),
+        el('div', { class: 'row2' }, ed.numField('top', 'Top'), ed.numField('bottom', 'Bottom')),
+        el('button', { class: 'icon', style: 'margin-top:8px;width:100%', text: '⛶ Detailed editor', onclick: () => openNineSliceModal(o) }));
+}
+
+/* Full-size, zoomable 9-slice editor in a modal. */
+function openNineSliceModal(o) {
+    const back = $('#modal-generic');
+    const asset = o.assetId && state.project.assets.images[o.assetId];
+    const img = o.assetId && state.imageCache[o.assetId];
+    if (!asset || !img || !img.naturalWidth) { toast('Assign a main asset first', 'warn'); return; }
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const fitScale = () => Math.min(620 / iw, 460 / ih);
+    let scale = Math.min(fitScale(), 1);
+    const ed = makeNineSliceBox(o, img, asset, scale);
+
+    const stage = el('div', {
+        style: 'overflow:auto;max-width:680px;max-height:480px;background:#0a0a0a;border:1px solid var(--border);'
+            + 'border-radius:var(--radius);padding:20px;display:flex;align-items:center;justify-content:center;'
+    }, ed.box);
+    const zlabel = el('span', { class: 'mini', style: 'min-width:48px;text-align:center', text: Math.round(scale * 100) + '%' });
+    const setScale = (s) => { scale = clamp(s, 0.05, 8); ed.relayout(scale); zlabel.textContent = Math.round(scale * 100) + '%'; };
+
+    const controls = el('div', { class: 'row', style: 'gap:6px;align-items:center;margin-bottom:10px' },
+        el('button', { class: 'icon', title: 'Zoom out', text: '−', onclick: () => setScale(scale / 1.25) }),
+        zlabel,
+        el('button', { class: 'icon', title: 'Zoom in', text: '+', onclick: () => setScale(scale * 1.25) }),
+        el('button', { class: 'icon', title: 'Fit', text: 'Fit', onclick: () => setScale(Math.min(fitScale(), 1)) }),
+        el('button', { class: 'icon', title: 'Actual size (100%)', text: '1:1', onclick: () => setScale(1) }),
+        el('span', { class: 'mini', style: 'margin-left:auto', text: iw + '×' + ih + ' px' })
+    );
+
+    // ctrl/⌘ + wheel to zoom inside the stage
+    stage.addEventListener('wheel', (e) => {
+        if (!e.ctrlKey && !e.metaKey) return;
+        e.preventDefault(); setScale(scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1));
+    }, { passive: false });
+
+    const body = el('div', { style: 'width:680px;max-width:100%' },
+        controls, stage,
+        el('div', { class: 'row2', style: 'margin-top:12px' }, ed.numField('left', 'Left'), ed.numField('right', 'Right')),
+        el('div', { class: 'row2' }, ed.numField('top', 'Top'), ed.numField('bottom', 'Bottom')),
+        el('div', { class: 'mini', style: 'margin-top:8px', text: 'Drag the guide lines or edit the numbers. Ctrl/⌘ + scroll to zoom.' })
+    );
+    openModal(back, '⛶ 9-Slice Editor — ' + (asset.name || 'image'), body,
+        [el('button', { class: 'primary', text: 'Done', onclick: () => { commit(); closeModal(back); renderInspector(); } })], 'lg');
 }
 
 function renderImageInspector(host, o) {
@@ -2325,6 +2428,30 @@ function openModal(backEl, title, bodyNode, footNodes, sizeClass = '') {
 }
 function closeModal(backEl) { backEl.classList.remove('open'); backEl.innerHTML = ''; }
 function closeAllModals() { $$('.modal-back').forEach(m => { m.classList.remove('open'); m.innerHTML = ''; }); }
+
+/* --------------------------- Legal & license ---------------------------- */
+function openLegalPanel() {
+    const back = $('#modal-generic');
+    const p = (txt, extra) => el('p', { style: 'margin:0 0 12px;line-height:1.6;' + (extra || ''), text: txt });
+    const body = el('div', { style: 'max-width:560px' },
+        el('div', {
+            style: 'font-size:13px;letter-spacing:.5px;text-transform:uppercase;color:var(--accent-color);margin-bottom:14px;'
+                + 'border-bottom:1px solid var(--primary-color);padding-bottom:10px;',
+            text: 'Copyright & License'
+        }),
+        p('Durmuş Cenker Cennet (cenullum) — copyright, all rights reserved. Do not distribute.',
+            'font-weight:600;color:var(--text-light);'),
+        p('This software (the "Localization Image Composer" tool) and its source code are the exclusive property of Durmuş Cenker Cennet (cenullum). You may not copy, modify, redistribute, resell, or otherwise share the tool itself in any form.'),
+        p('The images and other output you create with this tool belong to you. You are free to use, modify, distribute, and commercialize anything you produce with it, for any purpose, with no obligation to the author.'),
+        el('p', {
+            style: 'margin:16px 0 0;padding-top:12px;border-top:1px solid var(--primary-color);'
+                + 'font-size:12px;color:var(--text-mute);',
+            text: 'In short: your creations are yours; the tool is not. Don’t redistribute the tool.'
+        })
+    );
+    openModal(back, '⚖ Legal & License', body,
+        [el('button', { class: 'primary', text: 'I understand', onclick: () => closeModal(back) })], 'sm');
+}
 
 /* --------------------------- Assets panel ------------------------------- */
 async function importAssets(fileList) {
@@ -2634,7 +2761,8 @@ function openLocManager() {
         dropHint,
         el('div', { class: 'ctl', style: 'margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px' },
             el('button', { class: 'primary', text: '＋ Import Localization', title: 'Import JSON (single-lang or multi-lang) or CSV — auto-detected', onclick: async () => smartImportLoc(await pickFiles('.json,.csv', true)) }),
-            el('button', { text: '⬇ Sample JSON', onclick: downloadSampleJSON }),
+            el('button', { text: '⬇ Sample JSON A', title: 'Format A — key-major: { key: { lang: value } }', onclick: downloadSampleJSONA }),
+            el('button', { text: '⬇ Sample JSON B', title: 'Format B — language-major: { lang: { key: value } }', onclick: downloadSampleJSONB }),
             el('button', { text: '⬇ Sample Language', title: 'Download a single-language JSON example (en.json)', onclick: downloadSampleLangJSON }),
             el('button', { text: '⬇ Sample CSV', onclick: downloadSampleCSV })),
         summary, table, help);
@@ -2651,14 +2779,25 @@ function openLocManager() {
     openModal($('#modal-loc'), 'Localization Manager', body, [el('button', { text: 'Close', onclick: () => closeModal($('#modal-loc')) })], 'lg');
 }
 
-function downloadSampleJSON() {
+/* Format A — key-major: { key: { lang: value } } */
+function downloadSampleJSONA() {
     const sample = {
         play: { en: 'Play', tr: 'Oyna', de: 'Spielen', ja: 'プレイ' },
         settings: { en: 'Settings', tr: 'Ayarlar', de: 'Einstellungen', ja: '設定' },
         quit: { en: 'Quit', tr: 'Çıkış', de: 'Beenden', ja: '終了' },
         high_score: { en: 'High Score', tr: 'En Yüksek Skor', de: 'Highscore', ja: 'ハイスコア' }
     };
-    downloadBlob(new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' }), 'sample_localization.json');
+    downloadBlob(new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' }), 'sample_localization_A.json');
+}
+/* Format B — language-major: { lang: { key: value } } */
+function downloadSampleJSONB() {
+    const sample = {
+        en: { play: 'Play', settings: 'Settings', quit: 'Quit', high_score: 'High Score' },
+        tr: { play: 'Oyna', settings: 'Ayarlar', quit: 'Çıkış', high_score: 'En Yüksek Skor' },
+        de: { play: 'Spielen', settings: 'Einstellungen', quit: 'Beenden', high_score: 'Highscore' },
+        ja: { play: 'プレイ', settings: '設定', quit: '終了', high_score: 'ハイスコア' }
+    };
+    downloadBlob(new Blob([JSON.stringify(sample, null, 2)], { type: 'application/json' }), 'sample_localization_B.json');
 }
 function downloadSampleCSV() {
     const csv = 'key,en,tr,de,ja\n' +
@@ -3031,6 +3170,7 @@ function loadProject(proj, opts = {}) {
     state.pageId = proj.pages[0] ? proj.pages[0].id : null;
     state.selection = [];
     state.imageCache = {}; state.fontFaces = {};
+    _nsCache.clear();
     ensureAssetsLoaded();
     initHistory();
     refreshAll();
@@ -3238,6 +3378,7 @@ function setupToolbar() {
     gsz.addEventListener('change', () => { gsz.value = state.gridSize; });
     $('#btn-loc').onclick = openLocManager;
     $('#btn-fonts').onclick = openFontManager;
+    $('#btn-legal').onclick = openLegalPanel;
     $('#btn-export').onclick = openExportWizard;
 
     $('#lyr-up').onclick = () => moveLayer('up');
