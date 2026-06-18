@@ -250,6 +250,23 @@
         .mini { font-size: 10px; color: var(--text-mute); }
         .val-badge { font-size: 10px; color: var(--text-dim); min-width: 30px; text-align: right; }
 
+        /* ---------- 9-slice editor ---------- */
+        .ns-box { position: relative; margin: 4px auto 8px; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; touch-action: none;
+            background:
+              linear-gradient(45deg, #0e0e10 25%, transparent 25%),
+              linear-gradient(-45deg, #0e0e10 25%, transparent 25%),
+              linear-gradient(45deg, transparent 75%, #0e0e10 75%),
+              linear-gradient(-45deg, transparent 75%, #0e0e10 75%);
+            background-size: 14px 14px; background-position: 0 0, 0 7px, 7px -7px, -7px 0; background-color: #0a0a0a; }
+        .ns-box img { display: block; width: 100%; height: 100%; pointer-events: none; }
+        .ns-line { position: absolute; background: var(--accent-color); box-shadow: 0 0 0 1px rgba(0,0,0,.6); z-index: 2; }
+        .ns-line.v { top: 0; bottom: 0; width: 1px; margin-left: -0.5px; cursor: ew-resize; }
+        .ns-line.h { left: 0; right: 0; height: 1px; margin-top: -0.5px; cursor: ns-resize; }
+        .ns-line::after { content: ''; position: absolute; }
+        .ns-line.v::after { top: 0; bottom: 0; left: -4px; right: -4px; }
+        .ns-line.h::after { left: 0; right: 0; top: -4px; bottom: -4px; }
+        .ns-center { position: absolute; pointer-events: none; border: 1px dashed rgba(156,163,175,.5); z-index: 1; }
+
         /* ---------- Modal ---------- */
         .modal-back { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: none; align-items: center; justify-content: center; z-index: 100; }
         .modal-back.open { display: flex; }
@@ -323,8 +340,7 @@
             </div>
             <div class="tb-group">
                 <button id="btn-add-text" title="Add text">+ Text</button>
-                <button id="btn-add-image" title="Add image">+ Image</button>
-                <button id="btn-add-rect" title="Add rectangle">+ Rect</button>
+                <button id="btn-add-image" title="Add image (no asset = color/gradient fill)">+ Image</button>
             </div>
             <div class="tb-group">
                 <button id="btn-grid" class="toggle icon" title="Toggle grid">#</button>
@@ -380,7 +396,7 @@
                     <button id="btn-page-res" title="Edit page resolution">⛶ <span id="res-label">1080×1920</span></button>
                     <span class="warn-pill" id="fit-warn">⚠ <span id="fit-warn-text">0 overflow</span></span>
                     <div class="sep" style="flex:1"></div>
-                    <span class="mini" id="bg-wrap">BG <input type="color" id="page-bg" value="#1e1e22" style="vertical-align:middle"> <label style="color:var(--text-mute)"><input type="checkbox" id="page-bg-on"> fill</label></span>
+                    <span class="mini" id="bg-wrap">BG <label style="color:var(--text-mute)"><input type="checkbox" id="page-bg-on"> fill</label> <button id="btn-bg-edit" class="icon" title="Edit background fill (solid · gradient · checker)">⚙ Edit</button></span>
                 </div>
                 <div class="canvas-wrap" id="canvas-wrap">
                     <div class="stage" id="stage">
@@ -589,7 +605,7 @@ function newPage(name, w, h) {
     return {
         id: uid('page'), name: name || 'Page',
         resolution: (w && h) ? { width: w, height: h } : null, // null => inherit default
-        bg: '#1e1e22', bgOn: true,
+        bgFill: newFill({ type: 'solid', color: '#1e1e22' }), bgOn: true,
         objects: [] // index = z-order (last = top)
     };
 }
@@ -613,11 +629,78 @@ function newImageObject(x, y, assetId, w, h) {
         assetId: assetId || null, scale: 1, tintEnabled: false, tint: '#ffffff',
         flipX: false, flipY: false, blur: 0, glow: 0, glowColor: '#ffd479',
         shadow: false, shadowColor: '#000000', shadowBlur: 8, shadowOffsetX: 0, shadowOffsetY: 6,
-        hueShift: 0, brightness: 100, contrast: 100
+        hueShift: 0, brightness: 100, contrast: 100,
+        // When no asset is assigned, the object renders this fill (replaces the old "rect").
+        fill: newFill(),
+        // 9-slice border scaling. innerAssetId fills only the stretched center region.
+        nineSlice: { enabled: false, left: 32, top: 32, right: 32, bottom: 32 },
+        innerAssetId: null
     });
 }
-function newRectObject(x, y) {
-    return Object.assign(baseObj('rect', 'Rectangle', x, y, 400, 200), { color: '#6b7280' });
+
+/* ----------------------- Fill system (shared) --------------------------- *
+ * A single, extensible fill abstraction used by BOTH page backgrounds and
+ * texture-less image objects. Add a new entry to FILL_TYPES and it instantly
+ * works everywhere (inspector UI + canvas rendering). Each type provides:
+ *   label   — name shown in the type dropdown
+ *   fields  — (fill) => array of inspector rows
+ *   paint   — (ctx, fill, x, y, w, h) => fills that rectangle
+ * --------------------------------------------------------------------------*/
+const FILL_DEFAULTS = { type: 'solid', color: '#6b7280', color1: '#6b7280', color2: '#111114', angle: 90, kind: 'linear', size: 32 };
+function newFill(over) { return Object.assign({}, FILL_DEFAULTS, over); }
+function normFill(f) { return (f && typeof f === 'object') ? Object.assign({}, FILL_DEFAULTS, f) : newFill(); }
+
+const FILL_TYPES = {
+    solid: {
+        label: 'Solid',
+        fields: (f) => [row('Color', _fillColor(f, 'color'))],
+        paint: (ctx, f, x, y, w, h) => { ctx.fillStyle = f.color || '#000'; ctx.fillRect(x, y, w, h); }
+    },
+    gradient: {
+        label: 'Gradient',
+        fields: (f) => [
+            row('Kind', _fillSelect(f, 'kind', [{ value: 'linear', label: 'Linear' }, { value: 'radial', label: 'Radial' }])),
+            row('Color A', _fillColor(f, 'color1')),
+            row('Color B', _fillColor(f, 'color2')),
+            row('Angle', _fillRange(f, 'angle', 0, 360, 1, '°'))
+        ],
+        paint: (ctx, f, x, y, w, h) => {
+            const cx = x + w / 2, cy = y + h / 2;
+            let g;
+            if (f.kind === 'radial') {
+                g = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(w, h) / 2 || 1);
+            } else {
+                const a = (f.angle || 0) * D2R, dx = Math.cos(a), dy = Math.sin(a);
+                const half = (Math.abs(dx) * w + Math.abs(dy) * h) / 2 || 1;
+                g = ctx.createLinearGradient(cx - dx * half, cy - dy * half, cx + dx * half, cy + dy * half);
+            }
+            g.addColorStop(0, f.color1 || '#000'); g.addColorStop(1, f.color2 || '#000');
+            ctx.fillStyle = g; ctx.fillRect(x, y, w, h);
+        }
+    },
+    checker: {
+        label: 'Checkerboard',
+        fields: (f) => [
+            row('Color A', _fillColor(f, 'color1')),
+            row('Color B', _fillColor(f, 'color2')),
+            row('Cell px', _fillNum(f, 'size', { min: 2, step: 1 }))
+        ],
+        paint: (ctx, f, x, y, w, h) => {
+            const s = Math.max(2, f.size || 32);
+            ctx.save();
+            ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+            ctx.fillStyle = f.color1 || '#000'; ctx.fillRect(x, y, w, h);
+            ctx.fillStyle = f.color2 || '#fff';
+            const cols = Math.ceil(w / s), rows = Math.ceil(h / s);
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) if ((r + c) & 1) ctx.fillRect(x + c * s, y + r * s, s, s);
+            ctx.restore();
+        }
+    }
+};
+function paintFill(ctx, fill, x, y, w, h) {
+    const f = fill || FILL_DEFAULTS;
+    const t = FILL_TYPES[f.type] || FILL_TYPES.solid;
+    t.paint(ctx, f, x, y, w, h);
 }
 
 /* Global editor state */
@@ -1151,25 +1234,57 @@ function tintImage(img, color) {
     return c;
 }
 
+/* Tint a canvas (used for 9-slice composites; mirrors tintImage for <img>). */
+function tintCanvasColor(src, color) {
+    const c = document.createElement('canvas'); c.width = src.width; c.height = src.height;
+    const x = c.getContext('2d');
+    x.drawImage(src, 0, 0);
+    x.globalCompositeOperation = 'multiply'; x.fillStyle = color; x.fillRect(0, 0, c.width, c.height);
+    x.globalCompositeOperation = 'destination-in'; x.drawImage(src, 0, 0);
+    return c;
+}
+
+/* Build a 9-slice composite at (w×h): corners unscaled, edges + center stretched.
+   The center cell is filled by innerAssetId when present, else by the main texture. */
+function composeNineSlice(obj, img, w, h) {
+    const ns = obj.nineSlice || {};
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    let l = Math.max(0, ns.left || 0), t = Math.max(0, ns.top || 0), r = Math.max(0, ns.right || 0), b = Math.max(0, ns.bottom || 0);
+    if (l + r > iw && l + r > 0) { const k = iw / (l + r); l = Math.floor(l * k); r = Math.floor(r * k); }
+    if (t + b > ih && t + b > 0) { const k = ih / (t + b); t = Math.floor(t * k); b = Math.floor(b * k); }
+    const W = Math.max(1, Math.round(w)), H = Math.max(1, Math.round(h));
+    const dl = Math.min(l, W / 2), dr = Math.min(r, W / 2), dt = Math.min(t, H / 2), db = Math.min(b, H / 2);
+    const c = document.createElement('canvas'); c.width = W; c.height = H;
+    const x = c.getContext('2d');
+    const sCols = [[0, l], [l, iw - l - r], [iw - r, r]];          // [srcX, srcW]
+    const sRows = [[0, t], [t, ih - t - b], [ih - b, b]];
+    const dCols = [[0, dl], [dl, W - dl - dr], [W - dr, dr]];      // [dstX, dstW]
+    const dRows = [[0, dt], [dt, H - dt - db], [H - db, db]];
+    const innerImg = obj.innerAssetId && state.imageCache[obj.innerAssetId];
+    for (let ri = 0; ri < 3; ri++) for (let ci = 0; ci < 3; ci++) {
+        const [sx, sw] = sCols[ci], [sy, sh] = sRows[ri];
+        const [dx, dw] = dCols[ci], [dy, dh] = dRows[ri];
+        if (sw <= 0 || sh <= 0 || dw <= 0 || dh <= 0) continue;
+        if (ri === 1 && ci === 1 && innerImg && innerImg.complete && innerImg.naturalWidth) {
+            x.drawImage(innerImg, 0, 0, innerImg.naturalWidth, innerImg.naturalHeight, dx, dy, dw, dh);
+            continue;
+        }
+        x.drawImage(img, sx, sy, sw, sh, dx, dy, dw, dh);
+    }
+    return c;
+}
+
 function drawImageObject(ctx, obj) {
     const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
     const w = obj.width * (obj.scale || 1), h = obj.height * (obj.scale || 1);
     const img = obj.assetId && state.imageCache[obj.assetId];
+    const hasTex = img && img.complete && img.naturalWidth;
     ctx.save();
     ctx.globalAlpha = obj.alpha;
     ctx.translate(cx, cy);
     if (obj.rotation) ctx.rotate(obj.rotation * D2R);
     ctx.scale(obj.flipX ? -1 : 1, obj.flipY ? -1 : 1);
-    if (!img || !img.complete || !img.naturalWidth) {
-        // placeholder for missing/unloaded image
-        ctx.globalAlpha = obj.alpha * 0.5;
-        ctx.fillStyle = '#33333a'; ctx.fillRect(-w / 2, -h / 2, w, h);
-        ctx.strokeStyle = '#55555f'; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
-        ctx.fillStyle = '#888'; ctx.font = `${Math.max(12, Math.min(w, h) / 10)}px system-ui`;
-        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText('no image', 0, 0);
-        ctx.restore(); return;
-    }
+
     const filters = [];
     if (obj.blur > 0) filters.push(`blur(${obj.blur}px)`);
     if (obj.brightness !== 100) filters.push(`brightness(${obj.brightness}%)`);
@@ -1177,20 +1292,34 @@ function drawImageObject(ctx, obj) {
     if (obj.hueShift) filters.push(`hue-rotate(${obj.hueShift}deg)`);
     if (obj.shadow) filters.push(`drop-shadow(${obj.shadowOffsetX}px ${obj.shadowOffsetY}px ${obj.shadowBlur}px ${obj.shadowColor})`);
     if (obj.glow > 0) filters.push(`drop-shadow(0 0 ${obj.glow}px ${obj.glowColor})`);
-    ctx.filter = filters.length ? filters.join(' ') : 'none';
-    const src = obj.tintEnabled ? tintImage(img, obj.tint) : img;
-    ctx.drawImage(src, -w / 2, -h / 2, w, h);
-    ctx.restore();
-}
+    const filterStr = filters.length ? filters.join(' ') : 'none';
 
-function drawRectObject(ctx, obj) {
-    const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
-    ctx.save();
-    ctx.globalAlpha = obj.alpha;
-    ctx.translate(cx, cy);
-    if (obj.rotation) ctx.rotate(obj.rotation * D2R);
-    ctx.fillStyle = obj.color;
-    ctx.fillRect(-obj.width / 2, -obj.height / 2, obj.width, obj.height);
+    if (!hasTex) {
+        if (obj.assetId) {
+            // an asset is assigned but not yet loaded / broken → loading placeholder
+            ctx.globalAlpha = obj.alpha * 0.5;
+            ctx.fillStyle = '#33333a'; ctx.fillRect(-w / 2, -h / 2, w, h);
+            ctx.strokeStyle = '#55555f'; ctx.lineWidth = 2; ctx.strokeRect(-w / 2, -h / 2, w, h);
+            ctx.fillStyle = '#888'; ctx.font = `${Math.max(12, Math.min(w, h) / 10)}px system-ui`;
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText('no image', 0, 0);
+        } else {
+            // no texture → render the fill (this replaces the old standalone rectangle)
+            ctx.filter = filterStr;
+            paintFill(ctx, obj.fill, -w / 2, -h / 2, w, h);
+        }
+        ctx.restore(); return;
+    }
+
+    ctx.filter = filterStr;
+    if (obj.nineSlice && obj.nineSlice.enabled) {
+        let comp = composeNineSlice(obj, img, w, h);
+        if (obj.tintEnabled) comp = tintCanvasColor(comp, obj.tint);
+        ctx.drawImage(comp, -w / 2, -h / 2, w, h);
+    } else {
+        const src = obj.tintEnabled ? tintImage(img, obj.tint) : img;
+        ctx.drawImage(src, -w / 2, -h / 2, w, h);
+    }
     ctx.restore();
 }
 
@@ -1199,13 +1328,12 @@ function renderPageToCtx(ctx, page, lang, opts = {}) {
     const res = pageResolution(page);
     ctx.save();
     ctx.clearRect(0, 0, res.width, res.height);
-    if (page.bgOn) { ctx.fillStyle = page.bg; ctx.fillRect(0, 0, res.width, res.height); }
+    if (page.bgOn) paintFill(ctx, page.bgFill, 0, 0, res.width, res.height);
     else if (opts.bgFallback) { ctx.fillStyle = opts.bgFallback; ctx.fillRect(0, 0, res.width, res.height); }
     for (const obj of page.objects) {
         if (!obj.visible) continue;
         if (obj.type === 'text') { const fit = drawTextObject(ctx, obj, lang); if (opts.fitOut) opts.fitOut[obj.id] = fit; }
         else if (obj.type === 'image') drawImageObject(ctx, obj);
-        else if (obj.type === 'rect') drawRectObject(ctx, obj);
     }
     ctx.restore();
     ctx.filter = 'none';
@@ -1395,7 +1523,6 @@ function updateResLabel() {
     const res = pageResolution();
     $('#res-label').textContent = res.width + '×' + res.height;
     const pg = curPage();
-    $('#page-bg').value = pg.bg || '#1e1e22';
     $('#page-bg-on').checked = !!pg.bgOn;
 }
 state.objWarn = {};
@@ -1434,7 +1561,7 @@ function setupCanvasInteraction() {
 
     wrap.addEventListener('pointerdown', (e) => {
         if (e.target.classList.contains('handle')) return; // handled by handle listeners
-        if (e.target.closest('.canvas-ctrl')) return; // let overlay buttons receive their own clicks
+        if (e.target.closest('.canvas-ctrl, .canvas-ctrl-r')) return; // let overlay buttons receive their own clicks
         wrap.setPointerCapture(e.pointerId);
         const panMode = state.spaceDown || e.button === 1;
         if (panMode) {
@@ -1606,7 +1733,6 @@ function addObject(obj) {
     return obj;
 }
 function addText() { const o = newTextObject(0, 0); const p = placePos(o.width, o.height); o.x = p.x; o.y = p.y; addObject(o); toast('Text added'); }
-function addRect() { const o = newRectObject(0, 0); const p = placePos(o.width, o.height); o.x = p.x; o.y = p.y; addObject(o); toast('Rectangle added'); }
 function addImage(assetId) {
     const ids = Object.keys(state.project.assets.images);
     const aid = assetId || ids[ids.length - 1] || null;
@@ -1618,8 +1744,9 @@ function addImage(assetId) {
     }
     const o = newImageObject(0, 0, aid, w, h); const p = placePos(w, h); o.x = p.x; o.y = p.y;
     if (aid && state.project.assets.images[aid]) o.name = state.project.assets.images[aid].name.replace(/\.[^.]+$/, '');
+    else { o.name = 'Fill'; o.width = 400; o.height = 200; const p = placePos(o.width, o.height); o.x = p.x; o.y = p.y; }
     addObject(o);
-    if (!aid) toast('Image layer added — assign an asset in the Inspector', 'warn');
+    if (!aid) toast('Fill layer added — pick a color/gradient, or assign an asset', '', 2500);
 }
 
 function duplicateSelection() {
@@ -1665,13 +1792,19 @@ function toggleVis(id) { const o = getObj(id); if (o) { o.visible = !o.visible; 
 function toggleLock(id) { const o = getObj(id); if (o) { o.locked = !o.locked; if (o.locked) state.selection = state.selection.filter(s => s !== id); commit(); } }
 function renameObject(id, name) { const o = getObj(id); if (o) { o.name = name || o.type; commit(); } }
 
-const TYPE_ICON = { text: 'T', image: '🖼', rect: '▭' };
+const TYPE_ICON = { text: 'T', image: '🖼' };
+function fillSwatchCss(f) {
+    f = f || FILL_DEFAULTS;
+    if (f.type === 'gradient') return `linear-gradient(${(f.angle || 0) + 90}deg, ${f.color1}, ${f.color2})`;
+    if (f.type === 'checker') return f.color1;
+    return f.color || f.color1 || '#444';
+}
 function layerThumb(o) {
-    if (o.type === 'rect') return el('span', { class: 'ico swatch', style: 'background:' + (o.color || '#000') });
     if (o.type === 'image') {
         const asset = o.assetId && state.project.assets.images[o.assetId];
         if (asset && asset.data) return el('span', { class: 'ico thumb' }, el('img', { src: asset.data, alt: '' }));
-        return el('span', { class: 'ico', text: TYPE_ICON.image });
+        // texture-less image → show its fill as a swatch
+        return el('span', { class: 'ico swatch', style: 'background:' + fillSwatchCss(o.fill) });
     }
     return el('span', { class: 'ico', text: TYPE_ICON[o.type] || '?' });
 }
@@ -1681,7 +1814,7 @@ function renderHierarchy() {
     list.innerHTML = '';
     const objs = curObjects();
     if (!objs.length) {
-        list.append(el('div', { class: 'empty-hint', html: 'No layers yet.<br>Use <b>+ Text / + Image / + Rect</b> to add objects.' }));
+        list.append(el('div', { class: 'empty-hint', html: 'No layers yet.<br>Use <b>+ Text / + Image</b> to add objects.<br><span class="mini">An image with no asset becomes a color / gradient / checker fill.</span>' }));
         return;
     }
     for (let i = objs.length - 1; i >= 0; i--) {
@@ -1867,15 +2000,66 @@ function renderInspector() {
     host.innerHTML = '';
     const sel = selectedObjects();
     $('#insp-title').textContent = sel.length === 1 ? 'Inspector — ' + sel[0].name : 'Inspector';
-    if (!sel.length) {
-        host.append(el('div', { class: 'insp-empty', html: 'Select a layer to edit its properties.<br><br><span class="mini">Tip: hold <span class="kbd">Shift</span> to multi-select, drag on empty canvas to marquee.</span>' }));
-        return;
-    }
+    if (!sel.length) { renderBackgroundInspector(host); return; }
     if (sel.length > 1) { renderMultiInspector(host, sel); return; }
     const o = sel[0];
     if (o.type === 'text') renderTextInspector(host, o);
     else if (o.type === 'image') renderImageInspector(host, o);
-    else if (o.type === 'rect') renderRectInspector(host, o);
+}
+
+/* Shown when nothing is selected: edit the current page's background fill. */
+function renderBackgroundInspector(host) {
+    const pg = curPage();
+    host.append(
+        group('Page Background', 'pagebg', [
+            bindCheck(pg, 'bgOn', 'Fill background'),
+            el('div', { class: 'mini', text: 'Uses the same fill engine as image layers.' }),
+            fillEditor(pg, 'bgFill')
+        ]),
+        el('div', { class: 'insp-empty', html: 'Select a layer to edit its properties.<br><br><span class="mini">Tip: hold <span class="kbd">Shift</span> to multi-select, drag on empty canvas to marquee.</span>' })
+    );
+}
+
+/* ---- Shared fill editor (used by background + texture-less images) ---- */
+function _fillColor(f, prop) {
+    const i = el('input', { type: 'color', value: toHex(f[prop]) });
+    i.addEventListener('input', () => { f[prop] = i.value; requestCanvas(); });
+    i.addEventListener('change', () => commit());
+    return i;
+}
+function _fillNum(f, prop, opts = {}) {
+    const i = el('input', { type: 'number', value: fmtNum(f[prop]) });
+    if (opts.min != null) i.min = opts.min;
+    if (opts.step != null) i.step = opts.step;
+    i.addEventListener('input', () => { let v = parseFloat(i.value); if (isNaN(v)) return; if (opts.min != null) v = Math.max(opts.min, v); f[prop] = v; requestCanvas(); });
+    i.addEventListener('change', () => commit());
+    return i;
+}
+function _fillRange(f, prop, min, max, step, unit) {
+    const i = el('input', { type: 'range', min, max, step });
+    i.value = f[prop];
+    const badge = el('span', { class: 'val-badge', text: fmtNum(f[prop]) + (unit || '') });
+    i.addEventListener('input', () => { const v = parseFloat(i.value); f[prop] = v; badge.textContent = fmtNum(v) + (unit || ''); requestCanvas(); });
+    i.addEventListener('change', () => commit());
+    return el('div', { class: 'ctl' }, i, badge);
+}
+function _fillSelect(f, prop, options) {
+    const sel = el('select');
+    for (const op of options) sel.append(el('option', { value: op.value }, op.label));
+    sel.value = f[prop];
+    sel.addEventListener('change', () => { f[prop] = sel.value; commit(); });
+    return sel;
+}
+function fillEditor(owner, key) {
+    if (!owner[key]) owner[key] = newFill();
+    const fill = owner[key];
+    const typeSel = el('select');
+    for (const k in FILL_TYPES) typeSel.append(el('option', { value: k }, FILL_TYPES[k].label));
+    typeSel.value = fill.type || 'solid';
+    typeSel.addEventListener('change', () => { owner[key].type = typeSel.value; commit(); });
+    const def = FILL_TYPES[fill.type] || FILL_TYPES.solid;
+    const fieldHost = el('div', { class: 'gc', style: 'padding:0' }, ...def.fields(fill));
+    return el('div', {}, row('Type', typeSel), fieldHost);
 }
 
 function geomGroup(o, extra = []) {
@@ -1971,15 +2155,87 @@ function fitStatus(o) {
     return div;
 }
 
+function nineSliceEditor(o) {
+    const ns = o.nineSlice;
+    const asset = o.assetId && state.project.assets.images[o.assetId];
+    const img = o.assetId && state.imageCache[o.assetId];
+    if (!asset || !img || !img.naturalWidth) return el('div', { class: 'mini', text: 'Assign a main asset above to edit 9-slice borders.' });
+    const iw = img.naturalWidth, ih = img.naturalHeight;
+    const scale = Math.min(248 / iw, 220 / ih, 1);
+    const dispW = Math.max(1, Math.round(iw * scale)), dispH = Math.max(1, Math.round(ih * scale));
+    const box = el('div', { class: 'ns-box', style: `width:${dispW}px;height:${dispH}px` });
+    box.append(el('img', { src: asset.data, draggable: 'false' }));
+    const center = el('div', { class: 'ns-center' }); box.append(center);
+    const lines = {
+        left: el('div', { class: 'ns-line v' }), right: el('div', { class: 'ns-line v' }),
+        top: el('div', { class: 'ns-line h' }), bottom: el('div', { class: 'ns-line h' })
+    };
+    for (const k in lines) box.append(lines[k]);
+    const inputs = {};
+    function place() {
+        lines.left.style.left = (ns.left * scale) + 'px';
+        lines.right.style.left = (dispW - ns.right * scale) + 'px';
+        lines.top.style.top = (ns.top * scale) + 'px';
+        lines.bottom.style.top = (dispH - ns.bottom * scale) + 'px';
+        center.style.left = (ns.left * scale) + 'px';
+        center.style.top = (ns.top * scale) + 'px';
+        center.style.width = Math.max(0, dispW - (ns.left + ns.right) * scale) + 'px';
+        center.style.height = Math.max(0, dispH - (ns.top + ns.bottom) * scale) + 'px';
+    }
+    function syncInputs() { for (const s in inputs) if (document.activeElement !== inputs[s]) inputs[s].value = ns[s]; }
+    function bindLine(side) {
+        const line = lines[side];
+        line.addEventListener('pointerdown', (e) => {
+            e.preventDefault(); e.stopPropagation(); line.setPointerCapture(e.pointerId);
+            const rect = box.getBoundingClientRect();
+            const move = (ev) => {
+                const px = clamp((ev.clientX - rect.left) / scale, 0, iw), py = clamp((ev.clientY - rect.top) / scale, 0, ih);
+                if (side === 'left') ns.left = clamp(Math.round(px), 0, iw - ns.right - 1);
+                else if (side === 'right') ns.right = clamp(Math.round(iw - px), 0, iw - ns.left - 1);
+                else if (side === 'top') ns.top = clamp(Math.round(py), 0, ih - ns.bottom - 1);
+                else if (side === 'bottom') ns.bottom = clamp(Math.round(ih - py), 0, ih - ns.top - 1);
+                place(); syncInputs(); requestCanvas();
+            };
+            const up = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); commit(); };
+            window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+        });
+    }
+    for (const k in lines) bindLine(k);
+    place();
+    function numField(side, label) {
+        const i = el('input', { type: 'number', min: 0, value: ns[side] });
+        i.addEventListener('input', () => { let v = Math.max(0, parseInt(i.value, 10) || 0); ns[side] = v; place(); requestCanvas(); });
+        i.addEventListener('change', () => commit());
+        inputs[side] = i;
+        return field(label, i);
+    }
+    return el('div', {}, box,
+        el('div', { class: 'row2' }, numField('left', 'Left'), numField('right', 'Right')),
+        el('div', { class: 'row2' }, numField('top', 'Top'), numField('bottom', 'Bottom')));
+}
+
 function renderImageInspector(host, o) {
     const imgOpts = [{ value: '', label: '— none —' }].concat(Object.keys(state.project.assets.images).map(id => ({ value: id, label: state.project.assets.images[id].name })));
     const thumb = o.assetId && state.project.assets.images[o.assetId];
     host.append(
         group('Source', 'source', [
             row('Asset', bindSelect(o, 'assetId', imgOpts, { nullable: true })),
-            thumb ? el('img', { src: thumb.data, style: 'max-width:100%;max-height:120px;object-fit:contain;border:1px solid var(--border);border-radius:3px;background:#0a0a0a' }) : el('div', { class: 'mini', text: 'No asset assigned.' })
+            thumb ? el('img', { src: thumb.data, style: 'max-width:100%;max-height:120px;object-fit:contain;border:1px solid var(--border);border-radius:3px;background:#0a0a0a' }) : el('div', { class: 'mini', text: 'No asset assigned — this layer renders the Fill below.' })
         ]),
         geomGroup(o, [field('Scale', bindNum(o, 'scale', { step: 0.05, min: 0.01 }))]),
+        group('Fill (no texture)', 'imgfill', [
+            el('div', { class: 'mini', text: 'Rendered when no asset is assigned.' }),
+            fillEditor(o, 'fill')
+        ]),
+        group('9-Slice', 'nineslice', [
+            bindCheck(o.nineSlice, 'enabled', 'Enable 9-slice scaling'),
+            ...(o.nineSlice.enabled ? [
+                el('div', { class: 'mini', text: 'Corners stay fixed; edges + center stretch.' }),
+                row('Inner img', bindSelect(o, 'innerAssetId', imgOpts, { nullable: true })),
+                el('div', { class: 'mini', text: 'Inner image (optional) fills only the stretched center.' }),
+                nineSliceEditor(o)
+            ] : [])
+        ]),
         group('Flip', 'flip', [
             el('div', { class: 'row' }, bindCheck(o, 'flipX', 'Flip X'), bindCheck(o, 'flipY', 'Flip Y'))
         ]),
@@ -2003,13 +2259,6 @@ function renderImageInspector(host, o) {
                 field('Sh. X', bindNum(o, 'shadowOffsetX', { step: 1 })),
                 field('Sh. Y', bindNum(o, 'shadowOffsetY', { step: 1 }))),
         ])
-    );
-}
-
-function renderRectInspector(host, o) {
-    host.append(
-        geomGroup(o),
-        group('Fill', 'fill', [row('Color', bindColor(o, 'color'))])
     );
 }
 
@@ -2807,10 +3056,32 @@ function migrateProject(p) {
         pg.id = pg.id || uid('page');
         pg.objects = pg.objects || [];
         if (!('bgOn' in pg)) pg.bgOn = false;
-        if (!('bg' in pg)) pg.bg = '#1e1e22';
-        for (const o of pg.objects) o.id = o.id || uid('obj');
+        // background fill — migrate legacy solid `bg` into the new fill engine
+        if (!pg.bgFill) pg.bgFill = newFill({ type: 'solid', color: pg.bg || '#1e1e22' });
+        else pg.bgFill = normFill(pg.bgFill);
+        delete pg.bg;
+        for (const o of pg.objects) {
+            o.id = o.id || uid('obj');
+            // legacy "rect" objects become texture-less image fills
+            if (o.type === 'rect') {
+                o.type = 'image';
+                o.fill = newFill({ type: 'solid', color: o.color || '#6b7280' });
+                o.assetId = null;
+                delete o.color;
+            }
+            if (o.type === 'image') applyImageDefaults(o);
+        }
     }
     return p;
+}
+/* Fill in any image-object fields missing from older saves (and converted rects). */
+function applyImageDefaults(o) {
+    const d = newImageObject(o.x, o.y, o.assetId, o.width, o.height);
+    for (const k in d) if (!(k in o)) o[k] = d[k];
+    o.fill = normFill(o.fill);
+    if (!o.nineSlice || typeof o.nineSlice !== 'object') o.nineSlice = { enabled: false, left: 32, top: 32, right: 32, bottom: 32 };
+    else for (const s of ['left', 'top', 'right', 'bottom']) if (!(s in o.nineSlice)) o.nineSlice[s] = 32;
+    if (!('innerAssetId' in o)) o.innerAssetId = null;
 }
 function saveProject() {
     const data = JSON.stringify(state.project);
@@ -2953,7 +3224,6 @@ function setupToolbar() {
     $('#btn-redo').onclick = redo;
     $('#btn-add-text').onclick = addText;
     $('#btn-add-image').onclick = () => addImage();
-    $('#btn-add-rect').onclick = addRect;
     $('#btn-zoom-in').onclick = () => setZoom(state.zoom * 1.15);
     $('#btn-zoom-out').onclick = () => setZoom(state.zoom / 1.15);
     $('#btn-zoom-fit').onclick = fitToScreen;
@@ -2977,8 +3247,7 @@ function setupToolbar() {
 
     $('#preview-lang').addEventListener('change', (e) => { state.previewLang = e.target.value; renderCanvas(); renderInspector(); });
     $('#btn-page-res').onclick = openResolutionEditor;
-    $('#page-bg').addEventListener('input', (e) => { curPage().bg = e.target.value; requestCanvas(); });
-    $('#page-bg').addEventListener('change', () => commit());
+    $('#btn-bg-edit').onclick = () => { state.selection = []; refreshSelectionUI(); toast('Background fill — edit it in the Inspector →', '', 2000); };
     $('#page-bg-on').addEventListener('change', (e) => { curPage().bgOn = e.target.checked; commit(); });
     $('#sb-proj').style.cursor = 'pointer';
     $('#sb-proj').title = 'Rename project';
