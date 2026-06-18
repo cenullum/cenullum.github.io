@@ -377,7 +377,7 @@
                 <div class="lang-bar">
                     <span class="lbl" style="color:var(--text-mute);font-size:11px">Preview language</span>
                     <select id="preview-lang"><option value="__key">— Show keys —</option></select>
-                    <button id="btn-page-res" title="Edit page resolution">⛶ <span id="res-label">1920×1080</span></button>
+                    <button id="btn-page-res" title="Edit page resolution">⛶ <span id="res-label">1080×1920</span></button>
                     <span class="warn-pill" id="fit-warn">⚠ <span id="fit-warn-text">0 overflow</span></span>
                     <div class="sep" style="flex:1"></div>
                     <span class="mini" id="bg-wrap">BG <input type="color" id="page-bg" value="#1e1e22" style="vertical-align:middle"> <label style="color:var(--text-mute)"><input type="checkbox" id="page-bg-on"> fill</label></span>
@@ -572,11 +572,11 @@ const APP_VERSION = 1;
 const STORAGE_KEY = 'lic_autosave_v1';
 
 function newProject() {
-    const pg = newPage('Main Menu', 1920, 1080);
+    const pg = newPage('Main Menu', 1080, 1920);
     return {
         version: APP_VERSION,
         name: 'Untitled',
-        defaultResolution: { width: 1920, height: 1080 },
+        defaultResolution: { width: 1080, height: 1920 },
         pages: [pg],
         assets: { images: {}, fonts: {} },
         localization: { files: [] },
@@ -589,7 +589,7 @@ function newPage(name, w, h) {
     return {
         id: uid('page'), name: name || 'Page',
         resolution: (w && h) ? { width: w, height: h } : null, // null => inherit default
-        bg: '#1e1e22', bgOn: false,
+        bg: '#1e1e22', bgOn: true,
         objects: [] // index = z-order (last = top)
     };
 }
@@ -2793,7 +2793,7 @@ function migrateProject(p) {
     if (!p || typeof p !== 'object') throw new Error('Invalid project file');
     p.version = p.version || 1;
     p.name = p.name || 'Untitled';
-    p.defaultResolution = p.defaultResolution || { width: 1920, height: 1080 };
+    p.defaultResolution = p.defaultResolution || { width: 1080, height: 1920 };
     p.assets = p.assets || { images: {}, fonts: {} };
     p.assets.images = p.assets.images || {};
     p.assets.fonts = p.assets.fonts || {};
