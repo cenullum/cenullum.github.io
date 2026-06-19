@@ -357,6 +357,7 @@
                 <button id="btn-new" title="New project">New</button>
                 <button id="btn-open" title="Open project (.licproj)">Open</button>
                 <button id="btn-save" title="Save project">Save</button>
+                <button id="btn-example" title="Load the bundled example project">Example</button>
             </div>
             <div class="tb-group">
                 <button id="btn-add-text" title="Add text">+ Text</button>
@@ -635,7 +636,7 @@ function baseObj(type, name, x, y, w, h) {
 function newTextObject(x, y) {
     return Object.assign(baseObj('text', 'Text', x, y, 480, 140), {
         key: '', fallback: 'Sample Text',
-        fontId: null, fontSize: 64, fontWeight: 400, bold: false, italic: false,
+        fontId: null, fontSize: 300, fontWeight: 400, bold: false, italic: false,
         color: '#ffffff', align: 'center', valign: 'middle',
         letterSpacing: 0, lineSpacing: 1.2,
         outlineWidth: 0, outlineColor: '#000000',
@@ -2303,9 +2304,8 @@ function renderTextInspector(host, o) {
         ]),
         group('Font', 'font', [
             row('Font', bindSelect(o, 'fontId', fontOptions(), { nullable: true })),
-            el('div', { class: 'row2' },
-                field('Size', bindNum(o, 'fontSize', { step: 1, min: 2 })),
-                field('Weight', bindSelect(o, 'fontWeight', weightOptions(), { number: true }))),
+            row('Size', bindNum(o, 'fontSize', { step: 1, min: 2 })),
+            row('Weight', bindRange(o, 'fontWeight', 100, 900, 100)),
             row('Style', segStyle(o)),
             row('Align', seg(o, 'align', [{ value: 'left', label: '⬅' }, { value: 'center', label: '⬌' }, { value: 'right', label: '➡' }])),
             row('V-Align', seg(o, 'valign', [{ value: 'top', label: '⤒' }, { value: 'middle', label: '⊟' }, { value: 'bottom', label: '⤓' }])),
@@ -3588,6 +3588,16 @@ function newProjectAction() {
     state.project.name = 'Untitled';
     toast('New project created', 'ok');
 }
+async function openExampleProject() {
+    if (state.dirty && !confirm('Your current project has unsaved changes. Opening the example project will discard them. Are you sure?')) return;
+    try {
+        const resp = await fetch('example.licproj');
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const proj = await resp.json();
+        loadProject(proj);
+        toast('Example project loaded', 'ok');
+    } catch (e) { toast('Could not load example project: ' + e.message, 'err', 5000); }
+}
 function renameProjectPrompt() {
     const inp = el('input', { type: 'text', value: state.project.name, style: 'width:100%' });
     const body = el('div', {}, el('label', { class: 'mini', text: 'Project name (used for export/zip filenames)' }), inp);
@@ -3703,6 +3713,7 @@ function setupToolbar() {
     $('#btn-new').onclick = newProjectAction;
     $('#btn-open').onclick = openProjectFile;
     $('#btn-save').onclick = saveProject;
+    $('#btn-example').onclick = openExampleProject;
     $('#btn-undo').onclick = undo;
     $('#btn-redo').onclick = redo;
     $('#btn-add-text').onclick = addText;
