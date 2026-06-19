@@ -249,6 +249,11 @@
         .row > label { flex: 0 0 84px; color: var(--text-dim); font-size: 11px; }
         .row .ctl { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
         .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .wh-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; align-items: end; }
+        .ar-lock-btn { padding: 0 5px; height: 26px; line-height: 1; font-size: 13px; justify-content: center; background: transparent; border-color: var(--border); flex-shrink: 0; }
+        .ar-lock-btn.on { background: var(--surface-3); border-color: var(--primary-color); }
+        .fit-btns { display: flex; gap: 4px; margin-top: 2px; }
+        .fit-btns button { flex: 1; padding: 4px 2px; font-size: 10px; justify-content: center; }
         .field { display: flex; flex-direction: column; gap: 3px; }
         .field > label { color: var(--text-mute); font-size: 10px; text-transform: uppercase; letter-spacing: .04em; }
 
@@ -754,7 +759,9 @@ const state = {
     dirty: false,
     fontFaces: {},          // fontId -> { family, coverage }
     imageCache: {},         // assetId -> HTMLImageElement
-    fitReport: {}           // objId -> {fits, lang}
+    fitReport: {},          // objId -> {fits, lang}
+    arLocked: false, arLockedRatio: 1,
+    transformMode: 'scale', // 'scale' | 'screw'
 };
 state.pageId = state.project.pages[0].id;
 
@@ -1137,6 +1144,77 @@ function exportMergedLocalization() {
         [el('button', { text: 'Cancel', onclick: () => closeModal(back) })], 'sm');
 }
 
+/* --------- Manually managed languages & keys (no source file) ----------- *
+ * Manual additions live in a single synthetic loc file so they flow through
+ * allLocKeys / langList / export with no special-casing elsewhere. ------- */
+const MANUAL_LOC_ID = 'loc_manual';
+function getManualLocFile() { return state.project.localization.files.find(f => f.id === MANUAL_LOC_ID) || null; }
+function ensureManualLocFile() {
+    let f = getManualLocFile();
+    if (!f) {
+        f = { id: MANUAL_LOC_ID, name: '(manual)', format: 'json', manual: true, languages: [], keys: [], data: {}, raw: '' };
+        state.project.localization.files.push(f);
+    }
+    return f;
+}
+/* Languages contributed by actual loc files (i.e. removable, not asset-derived). */
+function fileLangs() {
+    const set = new Set();
+    for (const f of state.project.localization.files) for (const l of f.languages) set.add(l);
+    return Array.from(set);
+}
+function addManualLanguage(code) {
+    code = slugLang(code);
+    if (!code) return false;
+    const f = ensureManualLocFile();
+    if (!f.languages.includes(code)) f.languages.push(code);
+    for (const k of f.keys) { if (!f.data[k]) f.data[k] = {}; if (!(code in f.data[k])) f.data[k][code] = ''; }
+    commit();
+    return true;
+}
+/* Strip a language from every loc file (languages list + per-key data). */
+function removeLanguageEverywhere(code) {
+    code = String(code).toLowerCase();
+    for (const f of state.project.localization.files) {
+        f.languages = f.languages.filter(l => l !== code);
+        for (const k of Object.keys(f.data)) { if (f.data[k] && code in f.data[k]) delete f.data[k][code]; }
+    }
+    commit();
+}
+function addManualKey(key) {
+    key = String(key || '').trim();
+    if (!key) return false;
+    const f = ensureManualLocFile();
+    if (!f.keys.includes(key)) f.keys.push(key);
+    if (!f.data[key]) f.data[key] = {};
+    for (const l of langList()) { if (!(l in f.data[key])) f.data[key][l] = ''; }
+    commit();
+    return true;
+}
+function nextDefaultKey() {
+    const existing = new Set(allLocKeys());
+    let n = 1;
+    while (existing.has('text_' + n)) n++;
+    return 'text_' + n;
+}
+/* Dynamically discover every 2-letter ISO-639-1 code the browser recognises —
+   no hardcoded language list; names come from Intl.DisplayNames. */
+let _langCodeCache = null;
+function allLanguageCodes() {
+    if (_langCodeCache) return _langCodeCache;
+    const out = [];
+    let dn;
+    try { dn = new Intl.DisplayNames(['en'], { type: 'language' }); }
+    catch (e) { return (_langCodeCache = Array.from(KNOWN_LANGS)); }
+    for (let i = 97; i <= 122; i++) for (let j = 97; j <= 122; j++) {
+        const code = String.fromCharCode(i, j);
+        let name; try { name = dn.of(code); } catch (e) { continue; }
+        if (name && name.toLowerCase() !== code) out.push(code);
+    }
+    _langCodeCache = out.length ? out : Array.from(KNOWN_LANGS);
+    return _langCodeCache;
+}
+
 /* ------------------------------ Fonts ---------------------------------- */
 /* Real OpenType/TrueType cmap parser → glyph coverage (so font validation
    is accurate rather than guessed). Supports formats 0,4,6,12 + ttc. */
@@ -1350,20 +1428,45 @@ function layoutTextObject(ctx, obj, lang) {
 function drawTextObject(ctx, obj, lang) {
     const L = layoutTextObject(ctx, obj, lang);
     const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+
+    if (hasCorners(obj)) {
+        // Render text to offscreen canvas then apply quad distortion
+        const oc = document.createElement('canvas');
+        oc.width = Math.max(1, Math.round(obj.width)); oc.height = Math.max(1, Math.round(obj.height));
+        const oc2 = oc.getContext('2d');
+        // Paint text into offscreen at (0,0) relative coords
+        const shiftedObj = Object.assign({}, obj, { x: 0, y: 0, rotation: 0 });
+        _drawTextToCtxAt(oc2, shiftedObj, L, obj.width, obj.height);
+        ctx.save();
+        ctx.globalAlpha = obj.alpha;
+        ctx.translate(cx, cy);
+        if (obj.rotation) ctx.rotate(obj.rotation * D2R);
+        const cp = objCornerLocalPts(obj);
+        drawQuadAffine(ctx, oc, cp.nw, cp.ne, cp.sw, cp.se);
+        ctx.restore();
+        try { ctx.letterSpacing = '0px'; } catch (e) {}
+        return L;
+    }
+
     ctx.save();
     ctx.globalAlpha = obj.alpha;
     if (obj.rotation) { ctx.translate(cx, cy); ctx.rotate(obj.rotation * D2R); ctx.translate(-cx, -cy); }
-    setFont(ctx, obj, L.size, lang);
+    _drawTextToCtxAt(ctx, obj, L, obj.width, obj.height);
+    ctx.restore();
+    try { ctx.letterSpacing = '0px'; } catch (e) {}
+    return L;
+}
+function _drawTextToCtxAt(ctx, obj, L, w, h) {
+    setFont(ctx, obj, L.size, null);
     ctx.textBaseline = 'top';
     let tx, align;
     if (obj.align === 'left') { tx = obj.x; align = 'left'; }
-    else if (obj.align === 'right') { tx = obj.x + obj.width; align = 'right'; }
-    else { tx = obj.x + obj.width / 2; align = 'center'; }
+    else if (obj.align === 'right') { tx = obj.x + w; align = 'right'; }
+    else { tx = obj.x + w / 2; align = 'center'; }
     ctx.textAlign = align;
     let startY = obj.y;
-    if (obj.valign === 'bottom') startY = obj.y + (obj.height - L.blockH);
-    else if (obj.valign !== 'top') startY = obj.y + (obj.height - L.blockH) / 2;
-
+    if (obj.valign === 'bottom') startY = obj.y + (h - L.blockH);
+    else if (obj.valign !== 'top') startY = obj.y + (h - L.blockH) / 2;
     const paint = () => {
         for (let i = 0; i < L.lines.length; i++) {
             const ln = L.lines[i];
@@ -1379,13 +1482,9 @@ function drawTextObject(ctx, obj, lang) {
         ctx.save();
         ctx.shadowColor = obj.shadowColor; ctx.shadowBlur = obj.shadowBlur;
         ctx.shadowOffsetX = obj.shadowOffsetX; ctx.shadowOffsetY = obj.shadowOffsetY;
-        paint();
-        ctx.restore();
+        paint(); ctx.restore();
     }
     paint();
-    ctx.restore();
-    try { ctx.letterSpacing = '0px'; } catch (e) {}
-    return L;
 }
 
 function tintImage(img, color) {
@@ -1469,6 +1568,76 @@ function nineSliceCanvas(obj, img, w, h, assetId, innerAssetId) {
     return entry.canvas;
 }
 
+// Subdivided affine quad mapping (N×N grid of sub-cells, 2 triangles each).
+// More subdivisions = better perspective approximation. N=6 balances quality and speed.
+function drawQuadAffine(ctx, src, lnw, lne, lsw, lse, N = 25) {
+    const iW = src.naturalWidth || src.width, iH = src.naturalHeight || src.height;
+    if (!iW || !iH) return;
+
+    // Bilinear interpolation across the quad
+    const bx = (s, t) => (1-s)*(1-t)*lnw.x + s*(1-t)*lne.x + (1-s)*t*lsw.x + s*t*lse.x;
+    const by = (s, t) => (1-s)*(1-t)*lnw.y + s*(1-t)*lne.y + (1-s)*t*lsw.y + s*t*lse.y;
+
+    // Expand each triangle's clip 1px outward to cover clip anti-aliasing hairlines.
+    const PAD = 1.0;
+    function clip3(d0, d1, d2) {
+        const cx=(d0.x+d1.x+d2.x)/3, cy=(d0.y+d1.y+d2.y)/3;
+        const ex = p => { const vx=p.x-cx, vy=p.y-cy, L=Math.hypot(vx,vy)||1; return {x:p.x+vx/L*PAD, y:p.y+vy/L*PAD}; };
+        const [p0,p1,p2]=[ex(d0),ex(d1),ex(d2)];
+        ctx.beginPath(); ctx.moveTo(p0.x,p0.y); ctx.lineTo(p1.x,p1.y); ctx.lineTo(p2.x,p2.y); ctx.closePath(); ctx.clip();
+    }
+
+    for (let row = 0; row < N; row++) {
+        for (let col = 0; col < N; col++) {
+            const s0=col/N, s1=(col+1)/N, t0=row/N, t1=(row+1)/N;
+            const d00={x:bx(s0,t0), y:by(s0,t0)};
+            const d10={x:bx(s1,t0), y:by(s1,t0)};
+            const d01={x:bx(s0,t1), y:by(s0,t1)};
+            const d11={x:bx(s1,t1), y:by(s1,t1)};
+            const sx0=s0*iW, sy0=t0*iH, dw=(s1-s0)*iW, dh=(t1-t0)*iH;
+
+            // Each triangle draws the FULL source image with the affine transform
+            // derived from full-image coords → screen coords for this cell.
+            // Drawing sub-tiles instead caused 1px gaps from floating-point rounding;
+            // drawing the full image (clipped to the triangle) avoids that entirely.
+
+            // Triangle A: img(sx0,sy0)→d00  img(sx0+dw,sy0)→d10  img(sx0,sy0+dh)→d01
+            {
+                const a=(d10.x-d00.x)/dw, b=(d10.y-d00.y)/dw;
+                const c=(d01.x-d00.x)/dh, d=(d01.y-d00.y)/dh;
+                ctx.save(); clip3(d00,d10,d01);
+                ctx.transform(a, b, c, d, d00.x-a*sx0-c*sy0, d00.y-b*sx0-d*sy0);
+                ctx.drawImage(src, 0, 0, iW, iH);
+                ctx.restore();
+            }
+            // Triangle B: img(sx0+dw,sy0)→d10  img(sx0+dw,sy0+dh)→d11  img(sx0,sy0+dh)→d01
+            {
+                const a=(d11.x-d01.x)/dw, b=(d11.y-d01.y)/dw;
+                const c=(d11.x-d10.x)/dh, d=(d11.y-d10.y)/dh;
+                ctx.save(); clip3(d10,d11,d01);
+                ctx.transform(a, b, c, d, d01.x-a*sx0-c*(sy0+dh), d01.y-b*sx0-d*(sy0+dh));
+                ctx.drawImage(src, 0, 0, iW, iH);
+                ctx.restore();
+            }
+        }
+    }
+}
+function objCornerLocalPts(obj) {
+    const c = obj.corners || {};
+    const w = obj.width * (obj.scale || 1), h = obj.height * (obj.scale || 1);
+    return {
+        nw: { x: -w/2 + (c.nw?.x || 0), y: -h/2 + (c.nw?.y || 0) },
+        ne: { x:  w/2 + (c.ne?.x || 0), y: -h/2 + (c.ne?.y || 0) },
+        sw: { x: -w/2 + (c.sw?.x || 0), y:  h/2 + (c.sw?.y || 0) },
+        se: { x:  w/2 + (c.se?.x || 0), y:  h/2 + (c.se?.y || 0) }
+    };
+}
+function hasCorners(obj) {
+    const c = obj.corners; if (!c) return false;
+    return (c.nw?.x||0)!==0||(c.nw?.y||0)!==0||(c.ne?.x||0)!==0||(c.ne?.y||0)!==0||
+           (c.sw?.x||0)!==0||(c.sw?.y||0)!==0||(c.se?.x||0)!==0||(c.se?.y||0)!==0;
+}
+
 function drawImageObject(ctx, obj, lang) {
     const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
     const w = obj.width * (obj.scale || 1), h = obj.height * (obj.scale || 1);
@@ -1511,10 +1680,12 @@ function drawImageObject(ctx, obj, lang) {
     ctx.filter = filterStr;
     if (obj.nineSlice && obj.nineSlice.enabled) {
         const comp = nineSliceCanvas(obj, img, w, h, assetId, innerAssetId);
-        ctx.drawImage(comp, -w / 2, -h / 2, w, h);
+        if (hasCorners(obj)) { const cp = objCornerLocalPts(obj); drawQuadAffine(ctx, comp, cp.nw, cp.ne, cp.sw, cp.se); }
+        else ctx.drawImage(comp, -w / 2, -h / 2, w, h);
     } else {
         const src = obj.tintEnabled ? tintImage(img, obj.tint) : img;
-        ctx.drawImage(src, -w / 2, -h / 2, w, h);
+        if (hasCorners(obj)) { const cp = objCornerLocalPts(obj); drawQuadAffine(ctx, src, cp.nw, cp.ne, cp.sw, cp.se); }
+        else ctx.drawImage(src, -w / 2, -h / 2, w, h);
     }
     ctx.restore();
 }
@@ -1615,30 +1786,66 @@ function renderSelectionOverlay() {
         const obj = sel[0];
         const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
         const ang = (obj.rotation || 0) * D2R;
-        for (const [name, fx, fy] of HANDLE_DEFS) {
-            const lp = rotatePt(obj.x + obj.width * fx, obj.y + obj.height * fy, cx, cy, ang);
-            const s = canvasToScreen(lp.x, lp.y);
-            const h = el('div', { class: 'handle ' + name, 'data-handle': name });
-            h.style.left = (s.x - 5) + 'px'; h.style.top = (s.y - 5) + 'px';
-            h.addEventListener('pointerdown', (e) => startResize(e, name));
-            ov.append(h);
+
+        if (state.transformMode === 'screw') {
+            // In screw mode: only 4 corner handles at distorted positions
+            const cns = obj.corners || { nw:{x:0,y:0}, ne:{x:0,y:0}, sw:{x:0,y:0}, se:{x:0,y:0} };
+            const cornerLocalPos = {
+                nw: { x: -obj.width/2 + cns.nw.x, y: -obj.height/2 + cns.nw.y },
+                ne: { x:  obj.width/2 + cns.ne.x, y: -obj.height/2 + cns.ne.y },
+                sw: { x: -obj.width/2 + cns.sw.x, y:  obj.height/2 + cns.sw.y },
+                se: { x:  obj.width/2 + cns.se.x, y:  obj.height/2 + cns.se.y }
+            };
+            const worldPts = {};
+            for (const k in cornerLocalPos) {
+                const lp = cornerLocalPos[k];
+                worldPts[k] = rotatePt(cx + lp.x, cy + lp.y, cx, cy, ang);
+            }
+            // Draw quad outline via SVG
+            const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+            svg.setAttribute('style', 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible');
+            const pts = ['nw','ne','se','sw'].map(k => { const s = canvasToScreen(worldPts[k].x, worldPts[k].y); return `${s.x},${s.y}`; }).join(' ');
+            const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+            poly.setAttribute('points', pts);
+            poly.setAttribute('fill', 'none');
+            poly.setAttribute('stroke', 'rgba(156,163,175,0.7)');
+            poly.setAttribute('stroke-width', '1');
+            poly.setAttribute('stroke-dasharray', '4 3');
+            svg.appendChild(poly);
+            ov.append(svg);
+            for (const k of ['nw', 'ne', 'sw', 'se']) {
+                const s = canvasToScreen(worldPts[k].x, worldPts[k].y);
+                const h = el('div', { class: 'handle ' + k, 'data-handle': k });
+                h.style.left = (s.x - 5) + 'px'; h.style.top = (s.y - 5) + 'px';
+                h.addEventListener('pointerdown', (e) => startResize(e, k));
+                ov.append(h);
+            }
+        } else {
+            // Scale mode: all 8 handles + rotation
+            for (const [name, fx, fy] of HANDLE_DEFS) {
+                const lp = rotatePt(obj.x + obj.width * fx, obj.y + obj.height * fy, cx, cy, ang);
+                const s = canvasToScreen(lp.x, lp.y);
+                const h = el('div', { class: 'handle ' + name, 'data-handle': name });
+                h.style.left = (s.x - 5) + 'px'; h.style.top = (s.y - 5) + 'px';
+                h.addEventListener('pointerdown', (e) => startResize(e, name));
+                ov.append(h);
+            }
+            const nLocal = rotatePt(cx, obj.y, cx, cy, ang);
+            const nScr = canvasToScreen(nLocal.x, nLocal.y);
+            const rLocal = rotatePt(cx, obj.y - 26 / state.zoom, cx, cy, ang);
+            const rScr = canvasToScreen(rLocal.x, rLocal.y);
+            const line = el('div', { class: 'rot-line' });
+            const len = Math.hypot(rScr.x - nScr.x, rScr.y - nScr.y);
+            line.style.left = nScr.x + 'px'; line.style.top = nScr.y + 'px';
+            line.style.height = len + 'px';
+            line.style.transformOrigin = '0 0';
+            line.style.transform = `rotate(${Math.atan2(rScr.y - nScr.y, rScr.x - nScr.x) - Math.PI / 2}rad)`;
+            ov.append(line);
+            const rh = el('div', { class: 'handle rot', 'data-handle': 'rotate', title: 'Rotate' });
+            rh.style.left = (rScr.x - 5) + 'px'; rh.style.top = (rScr.y - 5) + 'px';
+            rh.addEventListener('pointerdown', startRotate);
+            ov.append(rh);
         }
-        // rotation handle + line
-        const nLocal = rotatePt(cx, obj.y, cx, cy, ang);
-        const nScr = canvasToScreen(nLocal.x, nLocal.y);
-        const rLocal = rotatePt(cx, obj.y - 26 / state.zoom, cx, cy, ang);
-        const rScr = canvasToScreen(rLocal.x, rLocal.y);
-        const line = el('div', { class: 'rot-line' });
-        const len = Math.hypot(rScr.x - nScr.x, rScr.y - nScr.y);
-        line.style.left = nScr.x + 'px'; line.style.top = nScr.y + 'px';
-        line.style.height = len + 'px';
-        line.style.transformOrigin = '0 0';
-        line.style.transform = `rotate(${Math.atan2(rScr.y - nScr.y, rScr.x - nScr.x) - Math.PI / 2}rad)`;
-        ov.append(line);
-        const rh = el('div', { class: 'handle rot', 'data-handle': 'rotate', title: 'Rotate' });
-        rh.style.left = (rScr.x - 5) + 'px'; rh.style.top = (rScr.y - 5) + 'px';
-        rh.addEventListener('pointerdown', startRotate);
-        ov.append(rh);
     }
 }
 
@@ -1802,6 +2009,10 @@ function setupCanvasInteraction() {
         if (drag.mode === 'move') {
             let dx = p.x - drag.sx, dy = p.y - drag.sy;
             if (Math.abs(dx) + Math.abs(dy) > 0.5) drag.moved = true;
+            if (e.shiftKey && drag.moved) {
+                if (!drag.axisLock) drag.axisLock = Math.abs(dx) >= Math.abs(dy) ? 'x' : 'y';
+                if (drag.axisLock === 'x') dy = 0; else dx = 0;
+            } else if (!e.shiftKey) { drag.axisLock = null; }
             for (const it of drag.items) {
                 const o = getObj(it.id); if (!o) continue;
                 o.x = snapV(it.x + dx); o.y = snapV(it.y + dy);
@@ -1809,6 +2020,8 @@ function setupCanvasInteraction() {
             requestCanvas(); renderInspectorLight(); updateStatus();
         } else if (drag.mode === 'resize') {
             doResize(p);
+        } else if (drag.mode === 'screw') {
+            doScrew(p);
         } else if (drag.mode === 'rotate') {
             doRotate(p, e.shiftKey);
         } else if (drag.mode === 'marquee') {
@@ -1865,6 +2078,24 @@ function finalizeMarquee() {
 function startResize(e, handle) {
     e.stopPropagation(); e.preventDefault();
     const obj = firstSelected(); if (!obj || obj.locked) return;
+
+    if (state.transformMode === 'screw') {
+        if (!['nw', 'ne', 'sw', 'se'].includes(handle)) return;
+        if (!obj.corners) obj.corners = { nw:{x:0,y:0}, ne:{x:0,y:0}, sw:{x:0,y:0}, se:{x:0,y:0} };
+        const p0 = screenToCanvas(e.clientX, e.clientY);
+        const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
+        const ra = -(obj.rotation || 0) * D2R;
+        const dx0 = p0.x - cx, dy0 = p0.y - cy;
+        drag = {
+            mode: 'screw', cornerKey: handle,
+            cx, cy, ra,
+            startLocalP: { x: dx0 * Math.cos(ra) - dy0 * Math.sin(ra), y: dx0 * Math.sin(ra) + dy0 * Math.cos(ra) },
+            startOffset: { ...obj.corners[handle] }
+        };
+        $('#canvas-wrap').setPointerCapture(e.pointerId);
+        return;
+    }
+
     const a = (obj.rotation || 0) * D2R;
     const ux = { x: Math.cos(a), y: Math.sin(a) }, uy = { x: -Math.sin(a), y: Math.cos(a) };
     const c0 = { x: obj.x + obj.width / 2, y: obj.y + obj.height / 2 };
@@ -1889,11 +2120,32 @@ function doResize(p) {
     if (drag.movesS) Bv = Math.max(Tv + MIN, dv);
     if (drag.movesN) Tv = Math.min(Bv - MIN, dv);
     let newW = Ru - Lu, newH = Bv - Tv;
+    // Aspect ratio lock: apply to corner handles only
+    const isCorner = (drag.movesE || drag.movesW) && (drag.movesN || drag.movesS);
+    if (state.arLocked && isCorner && state.arLockedRatio) {
+        const r = state.arLockedRatio;
+        newH = Math.max(MIN, newW / r);
+        if (drag.movesS) Bv = Tv + newH; else Tv = Bv - newH;
+    }
     const cu = (Lu + Ru) / 2, cv = (Tv + Bv) / 2;
     const nc = { x: c0.x + ux.x * cu + uy.x * cv, y: c0.y + ux.y * cu + uy.y * cv };
     if (state.snap) { newW = Math.max(MIN, snapV(newW)); newH = Math.max(MIN, snapV(newH)); }
     o.width = round(newW, 1); o.height = round(newH, 1);
     o.x = round(nc.x - newW / 2, 1); o.y = round(nc.y - newH / 2, 1);
+    drag.moved = true;
+    requestCanvas(); renderInspectorLight(); updateStatus();
+}
+function doScrew(p) {
+    const o = firstSelected(); if (!o) return;
+    if (!o.corners) o.corners = { nw:{x:0,y:0}, ne:{x:0,y:0}, sw:{x:0,y:0}, se:{x:0,y:0} };
+    const { cx, cy, ra } = drag;
+    const dx = p.x - cx, dy = p.y - cy;
+    const lx = dx * Math.cos(ra) - dy * Math.sin(ra);
+    const ly = dx * Math.sin(ra) + dy * Math.cos(ra);
+    o.corners[drag.cornerKey] = {
+        x: round(drag.startOffset.x + lx - drag.startLocalP.x, 1),
+        y: round(drag.startOffset.y + ly - drag.startLocalP.y, 1)
+    };
     drag.moved = true;
     requestCanvas(); renderInspectorLight(); updateStatus();
 }
@@ -2258,14 +2510,114 @@ function fillEditor(owner, key) {
     return el('div', {}, row('Type', typeSel), fieldHost);
 }
 
+function makeWHSection(o) {
+    let arLocked = false;
+    // lockedRatio is captured once when lock is turned ON and stays fixed — prevents ratio drift while typing
+    let lockedRatio = o.width / o.height;
+
+    const wInp = el('input', { type: 'number', step: '1', min: '1', id: 'insp-w' });
+    const hInp = el('input', { type: 'number', step: '1', min: '1', id: 'insp-h' });
+    wInp.value = fmtNum(o.width);
+    hInp.value = fmtNum(o.height);
+
+    const lockBtn = el('button', { class: 'ar-lock-btn', title: 'Lock aspect ratio', type: 'button' }, '🔓');
+    lockBtn.addEventListener('click', () => {
+        arLocked = !arLocked;
+        if (arLocked) { lockedRatio = o.width / o.height; state.arLocked = true; state.arLockedRatio = lockedRatio; }
+        else { state.arLocked = false; }
+        lockBtn.classList.toggle('on', arLocked);
+        lockBtn.textContent = arLocked ? '🔒' : '🔓';
+        lockBtn.title = arLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio';
+    });
+
+    wInp.addEventListener('input', () => {
+        let v = parseFloat(wInp.value); if (isNaN(v)) return;
+        v = Math.max(1, v);
+        if (arLocked) {
+            const nh = Math.max(1, Math.round(v / lockedRatio));
+            o.height = nh; hInp.value = fmtNum(nh);
+        }
+        o.width = v; liveUpdate();
+    });
+    wInp.addEventListener('change', () => { o.width = Math.max(1, parseFloat(wInp.value) || 1); commit(); });
+
+    hInp.addEventListener('input', () => {
+        let v = parseFloat(hInp.value); if (isNaN(v)) return;
+        v = Math.max(1, v);
+        if (arLocked) {
+            const nw = Math.max(1, Math.round(v * lockedRatio));
+            o.width = nw; wInp.value = fmtNum(nw);
+        }
+        o.height = v; liveUpdate();
+    });
+    hInp.addEventListener('change', () => { o.height = Math.max(1, parseFloat(hInp.value) || 1); commit(); });
+
+    const mkFit = (lbl, title, fn) => {
+        const b = el('button', { class: 'fit-btn', title, type: 'button' }, lbl);
+        b.addEventListener('click', () => { fn(); commit(); });
+        return b;
+    };
+
+    // Natural AR from asset image (only available for image layers with a loaded asset)
+    const natImg = o.assetId && state.imageCache && state.imageCache[o.assetId];
+    const naturalAR = natImg ? natImg.naturalWidth / natImg.naturalHeight : null;
+
+    const whRow = el('div', { class: 'wh-row' },
+        field('Width', wInp), lockBtn, field('Height', hInp));
+
+    const fitRow = el('div', { class: 'fit-btns' },
+        mkFit('↔ W', 'Fit width to canvas — scales height too if AR locked', () => {
+            const res = pageResolution();
+            o.width = res.width;
+            if (arLocked) { o.height = Math.max(1, Math.round(res.width / lockedRatio)); o.y = Math.round((res.height - o.height) / 2); }
+            o.x = 0;
+        }),
+        mkFit('↕ H', 'Fit height to canvas — scales width too if AR locked', () => {
+            const res = pageResolution();
+            o.height = res.height;
+            if (arLocked) { o.width = Math.max(1, Math.round(res.height * lockedRatio)); o.x = Math.round((res.width - o.width) / 2); }
+            o.y = 0;
+        }),
+        mkFit('⛶ Screen', 'Stretch layer to fill full canvas', () => {
+            const res = pageResolution();
+            o.width = res.width; o.height = res.height; o.x = 0; o.y = 0;
+        }),
+        naturalAR !== null ? mkFit('⊙ Orig AR', 'Restore original asset aspect ratio (adjusts height)', () => {
+            o.height = Math.max(1, Math.round(o.width / naturalAR));
+            const res = pageResolution(); o.y = Math.round((res.height - o.height) / 2);
+        }) : null
+    );
+
+    return [whRow, fitRow];
+}
+
+function transformModeToggle(o) {
+    const wrap = el('div', { class: 'seg' });
+    for (const [mode, lbl, title] of [['scale', '⊞ Scale', 'Scale mode: resize with handles'], ['screw', '⊹ Skew', 'Skew/perspective mode: drag corners independently']]) {
+        const b = el('button', { class: state.transformMode === mode ? 'on' : '', text: lbl, title });
+        b.addEventListener('click', () => {
+            state.transformMode = mode;
+            if (mode === 'scale' && o.corners) {
+                // Reset corners when switching back to scale
+                o.corners = { nw:{x:0,y:0}, ne:{x:0,y:0}, sw:{x:0,y:0}, se:{x:0,y:0} };
+                commit();
+            } else {
+                renderInspector(); renderSelectionOverlay();
+            }
+        });
+        wrap.append(b);
+    }
+    return row('Mode', wrap);
+}
 function geomGroup(o, extra = []) {
+    const [whRow, fitRow] = makeWHSection(o);
     return group('Transform', 'transform', [
+        transformModeToggle(o),
         el('div', { class: 'row2' },
             field('X', bindNum(o, 'x', { step: 1, id: 'insp-x' })),
             field('Y', bindNum(o, 'y', { step: 1, id: 'insp-y' }))),
-        el('div', { class: 'row2' },
-            field('Width', bindNum(o, 'width', { step: 1, min: 1, id: 'insp-w' })),
-            field('Height', bindNum(o, 'height', { step: 1, min: 1, id: 'insp-h' }))),
+        whRow,
+        fitRow,
         el('div', { class: 'row2' },
             field('Rotation°', bindNum(o, 'rotation', { step: 1, id: 'insp-rot' })),
             ...extra),
@@ -2278,6 +2630,20 @@ function renderTextInspector(host, o) {
     const previewVal = resolveText(o, state.previewLang);
     host.append(
         group('Content', 'content', [
+            (function() {
+                const inp = el('input', { type: 'text', placeholder: nextDefaultKey(), value: '', style: 'flex:1' });
+                const add = el('button', { class: 'primary', text: '＋ Add', title: 'Add a new localization key to every language' });
+                add.addEventListener('click', () => {
+                    if (!langList().length) { toast('Please add a language first (Localization Manager → Add Language)', 'warn', 4000); return; }
+                    const key = (inp.value.trim() || nextDefaultKey());
+                    if (allLocKeys().includes(key)) { o.key = key; commit(); toast('Key "' + key + '" already exists — selected', 'warn'); return; }
+                    o.key = key;
+                    addManualKey(key);
+                    toast('Added key: ' + key, 'ok');
+                });
+                inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); add.click(); } e.stopPropagation(); });
+                return field('Add New Key', el('div', { class: 'ctl', style: 'gap:6px' }, inp, add));
+            })(),
             row('Loc Key', bindSelect(o, 'key', keyOpts, { nullable: false })),
             (state.previewLang !== '__key' && o.key) ? (function() {
                 const lang = state.previewLang;
@@ -2290,18 +2656,21 @@ function renderTextInspector(host, o) {
             field('Fallback text', bindText(o, 'fallback', { area: true })),
             el('div', { class: 'mini', html: 'Preview: <b>' + escapeHtml(previewVal || '∅') + '</b>' })
         ]),
-        group('Safe Area & Transform', 'transform', [
-            el('div', { class: 'mini', text: 'Text is constrained to this rectangle (wrap → shrink).' }),
-            el('div', { class: 'row2' },
-                field('X', bindNum(o, 'x', { step: 1, id: 'insp-x' })),
-                field('Y', bindNum(o, 'y', { step: 1, id: 'insp-y' }))),
-            el('div', { class: 'row2' },
-                field('Width', bindNum(o, 'width', { step: 1, min: 1, id: 'insp-w' })),
-                field('Height', bindNum(o, 'height', { step: 1, min: 1, id: 'insp-h' }))),
-            el('div', { class: 'row2' },
-                field('Rotation°', bindNum(o, 'rotation', { step: 1, id: 'insp-rot' })),
-                field('Alpha', bindNum(o, 'alpha', { step: 0.05, min: 0, max: 1 }))),
-        ]),
+        (() => {
+            const [whRow, fitRow] = makeWHSection(o);
+            return group('Safe Area & Transform', 'transform', [
+                transformModeToggle(o),
+                el('div', { class: 'mini', text: 'Text is constrained to this rectangle (wrap → shrink).' }),
+                el('div', { class: 'row2' },
+                    field('X', bindNum(o, 'x', { step: 1, id: 'insp-x' })),
+                    field('Y', bindNum(o, 'y', { step: 1, id: 'insp-y' }))),
+                whRow,
+                fitRow,
+                el('div', { class: 'row2' },
+                    field('Rotation°', bindNum(o, 'rotation', { step: 1, id: 'insp-rot' })),
+                    field('Alpha', bindNum(o, 'alpha', { step: 0.05, min: 0, max: 1 }))),
+            ]);
+        })(),
         group('Font', 'font', [
             row('Font', bindSelect(o, 'fontId', fontOptions(), { nullable: true })),
             row('Size', bindNum(o, 'fontSize', { step: 1, min: 2 })),
@@ -3059,8 +3428,69 @@ async function replaceLocFile(id) {
     } catch (e) { toast('Parse error: ' + e.message, 'err', 5000); }
 }
 
+/* Export a single loc file as Format-A JSON (key-major). */
+function exportSingleLocFile(id) {
+    const f = state.project.localization.files.find(x => x.id === id);
+    if (!f) return;
+    const out = {};
+    for (const k of f.keys) {
+        out[k] = {};
+        for (const l of f.languages) { const v = f.data[k] && f.data[k][l]; if (v != null && v !== '') out[k][l] = v; }
+    }
+    const base = (f.name || 'localization').replace(/\.[^.]+$/, '');
+    downloadBlob(new Blob([JSON.stringify(out, null, 2)], { type: 'application/json' }), base + '.json');
+    toast('Exported ' + base + '.json — ' + f.keys.length + ' keys · ' + f.languages.length + ' lang', 'ok');
+}
+
+/* Searchable panel to add a language by its universal code. */
+function openAddLanguagePanel() {
+    const back = $('#modal-generic');
+    const present = new Set(langList());
+    const codes = allLanguageCodes();
+    const listWrap = el('div', { style: 'max-height:340px;overflow-y:auto;border:1px solid var(--border);border-radius:var(--radius)' });
+    const search = el('input', { type: 'text', placeholder: 'Search by code or name (e.g. tr, Turkish, Türkçe)…', style: 'width:100%;margin-bottom:10px' });
+
+    function render(filter) {
+        listWrap.innerHTML = '';
+        const q = String(filter || '').trim().toLowerCase();
+        let shown = 0;
+        for (const code of codes) {
+            const eng = langEnglishName(code), native = langDisplayName(code);
+            if (q && !(code.includes(q) || eng.toLowerCase().includes(q) || native.toLowerCase().includes(q))) continue;
+            if (++shown > 400 && q === '') break;
+            const added = present.has(code);
+            const row = el('div', {
+                style: 'display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border);cursor:' + (added ? 'default' : 'pointer') + ';opacity:' + (added ? '.5' : '1')
+            },
+                el('span', { style: 'font-weight:700;min-width:42px;color:var(--text-light)', text: code.toUpperCase() }),
+                el('span', { style: 'flex:1;color:var(--text-light)', text: eng }),
+                el('span', { style: 'color:var(--text-mute)', text: native === eng ? '' : native }),
+                added ? el('span', { class: 'tag', text: '✓ added' }) : el('span', { style: 'color:var(--primary-color);font-weight:700', text: '＋' })
+            );
+            if (!added) row.addEventListener('click', () => {
+                addManualLanguage(code);
+                present.add(code);
+                render(search.value);
+                refreshAll();
+                toast('Added language: ' + code.toUpperCase() + ' — ' + eng, 'ok');
+            });
+            listWrap.append(row);
+        }
+        if (!shown) listWrap.append(el('div', { class: 'mini', style: 'padding:14px;text-align:center', text: 'No matching language.' }));
+    }
+    search.addEventListener('input', () => render(search.value));
+    render('');
+
+    const body = el('div', { style: 'width:420px' },
+        el('div', { class: 'mini', style: 'margin-bottom:10px', text: 'Pick a language to add. Codes & names are generated dynamically from the browser (Intl).' }),
+        search, listWrap);
+    openModal(back, '＋ Add Language', body,
+        [el('button', { text: 'Done', onclick: () => { closeModal(back); openLocManager(); } })], 'sm');
+}
+
 function openLocManager() {
-    const files = state.project.localization.files;
+    const allFiles = state.project.localization.files;
+    const files = allFiles.filter(f => !f.manual);
     const langs = langList();
     const totalKeys = allLocKeys().length;
 
@@ -3080,6 +3510,7 @@ function openLocManager() {
         }
         const actions = el('div', { class: 'ctl' },
             el('button', { text: 'Replace', onclick: () => replaceLocFile(f.id) }),
+            el('button', { text: '⬇ Export', title: 'Export only this file (JSON Format A)', onclick: () => exportSingleLocFile(f.id) }),
             el('button', { class: 'danger', text: 'Remove', onclick: () => removeLocFile(f.id) }));
         table.append(el('tr', {}, el('td', { text: f.name }), el('td', { text: f.format.toUpperCase() }), el('td', {}, langCell), el('td', { text: f.keys.length }), el('td', {}, actions)));
     }
@@ -3094,6 +3525,29 @@ function openLocManager() {
 
     const summary = el('div', { class: 'mini', style: 'margin:6px 0 12px' }, `${files.length} file(s) · ${langs.length} language(s) [${langs.join(', ') || '—'}] · ${totalKeys} unique key(s)`);
 
+    // --- Languages section: chips (removable) + Add Language ---
+    const removable = new Set(fileLangs());
+    const chips = el('div', { class: 'ctl', style: 'flex-wrap:wrap;gap:6px;margin:4px 0 12px' });
+    if (!langs.length) chips.append(el('span', { class: 'mini', text: 'No languages yet — add one to start localizing.' }));
+    for (const l of langs) {
+        const label = l.toUpperCase() + ' · ' + langEnglishName(l) + (langDisplayName(l) === langEnglishName(l) ? '' : ' · ' + langDisplayName(l));
+        const chip = el('span', { class: 'tag', style: 'display:inline-flex;align-items:center;gap:6px', text: label });
+        if (removable.has(l)) {
+            const x = el('button', { class: 'danger', style: 'padding:0 6px;line-height:1.4;font-size:11px', title: 'Remove language', text: '✕' });
+            x.addEventListener('click', () => {
+                if (!confirm('Remove language "' + l.toUpperCase() + ' — ' + langEnglishName(l) + '"?\nAll its translations will be deleted from every file. This cannot be undone (except via Undo).')) return;
+                removeLanguageEverywhere(l); refreshAll(); openLocManager();
+            });
+            chip.append(x);
+        }
+        chips.append(chip);
+    }
+    const langSection = el('div', {},
+        el('div', { class: 'ctl', style: 'justify-content:space-between;align-items:center;margin-bottom:4px' },
+            el('b', { style: 'color:var(--text-light)', text: 'Languages' }),
+            el('button', { class: 'primary', text: '＋ Add Language', onclick: openAddLanguagePanel })),
+        chips);
+
     const dropHint = el('div', { class: 'help', style: 'border:1.5px dashed var(--border);border-radius:var(--radius);padding:12px 16px;text-align:center;margin-bottom:12px;transition:all .2s;cursor:pointer;font-size:12px;', text: 'Drop JSON / CSV files or a folder here, or click to browse' });
     dropHint.addEventListener('mouseenter', () => { dropHint.style.borderColor='var(--primary-color)'; dropHint.style.background='var(--surface-2)'; dropHint.style.color='var(--text-light)'; dropHint.style.fontWeight='600'; dropHint.style.fontSize='13px'; });
     dropHint.addEventListener('mouseleave', () => { dropHint.style.borderColor=''; dropHint.style.background=''; dropHint.style.color=''; dropHint.style.fontWeight=''; dropHint.style.fontSize='12px'; });
@@ -3105,7 +3559,7 @@ function openLocManager() {
             el('button', { text: '⬇ Sample JSON B', title: 'Format B — language-major: { lang: { key: value } }', onclick: downloadSampleJSONB }),
             el('button', { text: '⬇ Sample Language', title: 'Download a single-language JSON example (en.json)', onclick: downloadSampleLangJSON }),
             el('button', { text: '⬇ Sample CSV', onclick: downloadSampleCSV })),
-        summary, table, help);
+        summary, langSection, table, help);
 
     // wire drop zone on the modal body
     dropHint.addEventListener('dragover', (e) => { e.preventDefault(); dropHint.style.borderColor = 'var(--primary-color)'; dropHint.style.background = 'var(--surface-2)'; });
@@ -3117,7 +3571,7 @@ function openLocManager() {
     });
 
     openModal($('#modal-loc'), 'Localization Manager', body, [
-        el('button', { class: 'primary', text: '⬇ Export Localization', title: 'Download all loaded localization as one merged JSON (Format A)', onclick: exportMergedLocalization }),
+        el('button', { class: 'primary', text: '⬇ Export Merged', title: 'Download all loaded localization as one merged JSON (Format A)', onclick: exportMergedLocalization }),
         el('button', { text: 'Close', onclick: () => closeModal($('#modal-loc')) })
     ], 'lg');
 }
