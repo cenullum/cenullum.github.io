@@ -1579,7 +1579,7 @@ function drawQuadAffine(ctx, src, lnw, lne, lsw, lse, N = 25) {
     const by = (s, t) => (1-s)*(1-t)*lnw.y + s*(1-t)*lne.y + (1-s)*t*lsw.y + s*t*lse.y;
 
     // Expand each triangle's clip 1px outward to cover clip anti-aliasing hairlines.
-    const PAD = 1.0;
+    const PAD = 2.0;
     function clip3(d0, d1, d2) {
         const cx=(d0.x+d1.x+d2.x)/3, cy=(d0.y+d1.y+d2.y)/3;
         const ex = p => { const vx=p.x-cx, vy=p.y-cy, L=Math.hypot(vx,vy)||1; return {x:p.x+vx/L*PAD, y:p.y+vy/L*PAD}; };
