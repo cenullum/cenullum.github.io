@@ -2831,13 +2831,30 @@ function openResolutionEditor() {
     openModal($('#modal-generic'), 'Page Resolution — ' + pg.name, body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-generic')) }), save], 'sm');
 }
 
+/* "en" adını İngilizce olarak döndürür: "en" → "English", "tr" → "Turkish" */
+function langEnglishName(code) {
+    if (!code) return '';
+    try {
+        const dn = new Intl.DisplayNames(['en'], { type: 'language' });
+        const name = dn.of(code);
+        if (!name || name === code) return code.toUpperCase();
+        return name.charAt(0).toUpperCase() + name.slice(1);
+    } catch (e) { return String(code).toUpperCase(); }
+}
+
 function updatePreviewLangOptions() {
     const sel = $('#preview-lang');
     const langs = langList();
     const prev = state.previewLang;
     sel.innerHTML = '';
     sel.append(el('option', { value: '__key' }, '— Show keys —'));
-    for (const l of langs) sel.append(el('option', { value: l }, l));
+    for (const l of langs) {
+        const code  = l.toUpperCase();
+        const eng   = langEnglishName(l);
+        const native = langDisplayName(l);
+        const label = eng === native ? code + ' — ' + eng : code + ' — ' + eng + ' — ' + native;
+        sel.append(el('option', { value: l }, label));
+    }
     sel.value = (prev === '__key' || langs.includes(prev)) ? prev : '__key';
     state.previewLang = sel.value;
 }
