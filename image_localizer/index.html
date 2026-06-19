@@ -128,6 +128,7 @@
         .layer.selected { background: rgba(107,114,128,.35); border-color: var(--primary-color); }
         .layer.dragover-top { box-shadow: inset 0 2px 0 var(--accent-color); }
         .layer.dragover-bottom { box-shadow: inset 0 -2px 0 var(--accent-color); }
+        .layer.dragover-into { box-shadow: inset 0 0 0 2px var(--accent-color); background: rgba(156,163,175,.12); }
         .layer .ico { width: 16px; text-align: center; opacity: .8; flex: 0 0 auto; }
         .layer .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .layer .nm input { width: 100%; background: var(--dark-bg); border: 1px solid var(--primary-color); color: #fff; padding: 2px 4px; border-radius: 2px; font-size: 12px; }
@@ -143,6 +144,16 @@
         .layer .ico.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .layer .ico.swatch { border: 1px solid var(--border); }
         .layer .key-chip { flex: 0 0 auto; max-width: 92px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 9px; font-family: ui-monospace, 'DejaVu Sans Mono', monospace; color: var(--accent-color); background: var(--surface-3); border-radius: 8px; padding: 1px 6px; }
+        .layer.group-header { background: var(--dark-bg); border-color: var(--border); }
+        .layer.group-header:hover { background: var(--surface-3); }
+        .layer.group-child { padding-left: 4px; border-left: 2px solid transparent; margin-left: 8px; }
+        .layer.group-child:hover { filter: brightness(1.15); }
+        .layer .layer-expand { cursor: pointer; width: 14px; text-align: center; flex: 0 0 auto; font-size: 9px; opacity: .6; user-select: none; }
+        .layer .layer-expand:hover { opacity: 1; }
+        .layer .gm-btn { opacity: .55; cursor: pointer; width: 18px; text-align: center; flex: 0 0 auto; font-size: 12px; }
+        .layer .gm-btn:hover { opacity: 1; }
+        .layer .gm-btn.active { opacity: 1; color: var(--accent-color); }
+        .layer-indent { display: inline-block; width: 8px; flex-shrink: 0; }
         .empty-hint { padding: 16px; color: var(--text-mute); text-align: center; font-size: 12px; line-height: 1.6; }
 
         /* ---------- Assets ---------- */
@@ -367,6 +378,7 @@
             <div class="tb-group">
                 <button id="btn-add-text" title="Add text">+ Text</button>
                 <button id="btn-add-image" title="Add image (no asset = color/gradient fill)">+ Image</button>
+                <button id="btn-add-group" title="Add group (selected layers join it)">+ Group</button>
             </div>
             <div class="tb-group">
                 <button id="btn-grid" class="toggle icon" title="Toggle grid">#</button>
@@ -622,7 +634,7 @@ function newProject() {
         assets: { images: {}, fonts: {} },
         localization: { files: [] },
         fontAssignment: { global: null, perLanguage: {} },
-        exportSettings: { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null }
+        exportSettings: { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null, scale: 1 }
     };
 }
 
@@ -648,6 +660,12 @@ function newTextObject(x, y) {
         shadow: false, shadowColor: '#000000', shadowBlur: 4, shadowOffsetX: 2, shadowOffsetY: 2,
         autoShrink: true, minFontSize: 12
     });
+}
+const _GROUP_HUES = [200, 30, 140, 280, 355, 170, 60, 310, 90, 240];
+let _groupHueIdx = 0;
+function newGroupObject(name) {
+    const hue = _GROUP_HUES[_groupHueIdx++ % _GROUP_HUES.length];
+    return { id: uid('grp'), type: 'group', name: name || 'Group', visible: true, locked: false, groupMove: true, childIds: [], hue };
 }
 function newImageObject(x, y, assetId, w, h) {
     return Object.assign(baseObj('image', 'Image', x, y, w || 400, h || 400), {
@@ -762,6 +780,7 @@ const state = {
     fitReport: {},          // objId -> {fits, lang}
     arLocked: false, arLockedRatio: 1,
     transformMode: 'scale', // 'scale' | 'screw'
+    groupCollapsed: new Set(), // set of group ids that are collapsed in hierarchy
 };
 state.pageId = state.project.pages[0].id;
 
@@ -1698,7 +1717,7 @@ function renderPageToCtx(ctx, page, lang, opts = {}) {
     if (page.bgOn) paintFill(ctx, page.bgFill, 0, 0, res.width, res.height);
     else if (opts.bgFallback) { ctx.fillStyle = opts.bgFallback; ctx.fillRect(0, 0, res.width, res.height); }
     for (const obj of page.objects) {
-        if (!obj.visible) continue;
+        if (!obj.visible || obj.type === 'group') continue;
         if (obj.type === 'text') { const fit = drawTextObject(ctx, obj, lang); if (opts.fitOut) opts.fitOut[obj.id] = fit; }
         else if (obj.type === 'image') drawImageObject(ctx, obj, lang);
     }
@@ -1918,7 +1937,11 @@ function updateStatus() {
     else if (sel.length === 1) {
         const o = sel[0];
         $('#sb-sel').textContent = `${o.name} (${o.type})`;
-        $('#sb-pos').textContent = `x ${Math.round(o.x)}  y ${Math.round(o.y)}  ·  ${Math.round(o.width)}×${Math.round(o.height)}  ·  ${Math.round(o.rotation || 0)}°`;
+        if (o.type === 'group') {
+            $('#sb-pos').textContent = (o.childIds && o.childIds.length ? o.childIds.length + ' layer(s)' : 'empty group') + (o.groupMove ? '  ·  🔗' : '');
+        } else {
+            $('#sb-pos').textContent = `x ${Math.round(o.x)}  y ${Math.round(o.y)}  ·  ${Math.round(o.width)}×${Math.round(o.height)}  ·  ${Math.round(o.rotation || 0)}°`;
+        }
     } else { $('#sb-sel').textContent = sel.length + ' selected'; $('#sb-pos').textContent = ''; }
     $('#sb-proj').textContent = state.project.name + (state.dirty ? ' *' : '');
 }
@@ -1943,13 +1966,13 @@ function hitTest(x, y) {
     const objs = curObjects();
     for (let i = objs.length - 1; i >= 0; i--) {
         const o = objs[i];
-        if (!o.visible || o.locked) continue;
+        if (o.type === 'group' || !o.visible || o.locked) continue;
         if (pointInObj(o, x, y)) return o;
     }
     // second pass allow locked (so it can be selected even if not movable)
     for (let i = objs.length - 1; i >= 0; i--) {
         const o = objs[i];
-        if (!o.visible) continue;
+        if (o.type === 'group' || !o.visible) continue;
         if (pointInObj(o, x, y)) return o;
     }
     return null;
@@ -1983,10 +2006,20 @@ function setupCanvasInteraction() {
                 state.selection = [hit.id];
             }
             refreshSelectionUI();
-            const movable = selectedObjects().filter(o => !o.locked);
+            const movable = selectedObjects().filter(o => !o.locked && o.type !== 'group');
+            const moveIds = new Set(movable.map(o => o.id));
+            for (const mo of movable) {
+                const grp = findGroupOf(mo.id);
+                if (grp && grp.groupMove) {
+                    for (const cid of (grp.childIds || [])) {
+                        if (!moveIds.has(cid)) { const sib = getObj(cid); if (sib && !sib.locked) { moveIds.add(cid); } }
+                    }
+                }
+            }
+            const allMovable = Array.from(moveIds).map(id => getObj(id)).filter(Boolean);
             drag = {
                 mode: 'move', moved: false, sx: p.x, sy: p.y,
-                items: movable.map(o => ({ id: o.id, x: o.x, y: o.y }))
+                items: allMovable.map(o => ({ id: o.id, x: o.x, y: o.y }))
             };
         } else {
             if (!e.shiftKey) { state.selection = []; refreshSelectionUI(); }
@@ -2067,7 +2100,7 @@ function finalizeMarquee() {
     const x2 = Math.max(drag.sx, drag.cur.x), y2 = Math.max(drag.sy, drag.cur.y);
     const sel = new Set(drag.base);
     for (const o of curObjects()) {
-        if (!o.visible) continue;
+        if (!o.visible || o.type === 'group') continue;
         const cx = o.x + o.width / 2, cy = o.y + o.height / 2;
         if (cx >= x1 && cx <= x2 && cy >= y1 && cy <= y2) sel.add(o.id);
     }
@@ -2198,7 +2231,7 @@ function addImage(assetId) {
 }
 
 function duplicateSelection() {
-    const sel = selectedObjects(); if (!sel.length) return;
+    const sel = selectedObjects().filter(o => o.type !== 'group'); if (!sel.length) return;
     const objs = curObjects(); const clones = [];
     for (const o of sel) {
         const c = deepClone(o); c.id = uid('obj'); c.x += 24; c.y += 24; c.name = o.name + ' copy';
@@ -2210,6 +2243,10 @@ function deleteSelection() {
     if (!state.selection.length) return;
     const set = new Set(state.selection);
     const pg = curPage();
+    // If a group is selected, delete its children too
+    for (const o of pg.objects) { if (o.type === 'group' && set.has(o.id)) for (const cid of (o.childIds || [])) set.add(cid); }
+    // Remove deleted ids from remaining groups' childIds
+    for (const o of pg.objects) { if (o.type === 'group' && !set.has(o.id) && o.childIds) o.childIds = o.childIds.filter(id => !set.has(id)); }
     pg.objects = pg.objects.filter(o => !set.has(o.id));
     state.selection = [];
     commit();
@@ -2229,7 +2266,7 @@ function pasteClipboard() {
     toast(ids.length + ' pasted', '', 1200);
 }
 function moveLayer(dir) {
-    const sel = selectedObjects(); if (sel.length !== 1) return;
+    const sel = selectedObjects().filter(o => o.type !== 'group'); if (sel.length !== 1) return;
     const objs = curObjects(); const i = objs.indexOf(sel[0]);
     const j = dir === 'up' ? i + 1 : i - 1; // up = higher z = later in array
     if (j < 0 || j >= objs.length) return;
@@ -2239,6 +2276,59 @@ function moveLayer(dir) {
 function toggleVis(id) { const o = getObj(id); if (o) { o.visible = !o.visible; commit(); } }
 function toggleLock(id) { const o = getObj(id); if (o) { o.locked = !o.locked; if (o.locked) state.selection = state.selection.filter(s => s !== id); commit(); } }
 function renameObject(id, name) { const o = getObj(id); if (o) { o.name = name || o.type; commit(); } }
+
+/* ---------- Group helpers ---------- */
+function findGroupOf(objId) {
+    return curObjects().find(o => o.type === 'group' && o.childIds && o.childIds.includes(objId)) || null;
+}
+function toggleGroupVis(g) {
+    g.visible = !g.visible;
+    const objs = curObjects();
+    for (const cid of (g.childIds || [])) { const c = objs.find(o => o.id === cid); if (c) c.visible = g.visible; }
+    commit();
+}
+function addGroup() {
+    const sel = selectedObjects().filter(o => o.type !== 'group');
+    const g = newGroupObject();
+    curObjects().push(g);
+    for (const o of sel) {
+        const ex = findGroupOf(o.id);
+        if (ex) ex.childIds = ex.childIds.filter(id => id !== o.id);
+        g.childIds.push(o.id);
+    }
+    state.selection = [g.id];
+    commit();
+    toast(sel.length ? 'Group created with ' + sel.length + ' layer(s)' : 'Empty group created');
+}
+function removeFromGroup(objId) {
+    const g = findGroupOf(objId); if (!g) return;
+    g.childIds = g.childIds.filter(id => id !== objId);
+    commit();
+}
+function setGroupOf(objId, groupId) {
+    const prev = findGroupOf(objId);
+    if (prev) prev.childIds = prev.childIds.filter(id => id !== objId);
+    if (groupId) {
+        const g = getObj(groupId);
+        if (g && g.type === 'group' && !g.childIds.includes(objId)) g.childIds.push(objId);
+    }
+    commit();
+}
+function deleteGroup(groupId) {
+    const g = getObj(groupId); if (!g || g.type !== 'group') return;
+    const pg = curPage();
+    const toDelete = new Set([groupId, ...(g.childIds || [])]);
+    pg.objects = pg.objects.filter(o => !toDelete.has(o.id));
+    state.selection = state.selection.filter(id => !toDelete.has(id));
+    commit();
+}
+function ungroupGroup(groupId) {
+    const pg = curPage();
+    pg.objects = pg.objects.filter(o => o.id !== groupId);
+    state.selection = state.selection.filter(id => id !== groupId);
+    commit();
+    toast('Ungrouped');
+}
 
 const TYPE_ICON = { text: 'T', image: '🖼' };
 function fillSwatchCss(f) {
@@ -2257,60 +2347,154 @@ function layerThumb(o) {
     return el('span', { class: 'ico', text: TYPE_ICON[o.type] || '?' });
 }
 
+function _clearDragClasses(row) { row.classList.remove('dragover-top', 'dragover-bottom', 'dragover-into'); }
+
+function _layerDragHandlers(row, o) {
+    row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', o.id); e.dataTransfer.effectAllowed = 'move'; });
+    row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const r = row.getBoundingClientRect();
+        const top = (e.clientY - r.top) < r.height / 2;
+        row.classList.toggle('dragover-top', top);
+        row.classList.toggle('dragover-bottom', !top);
+    });
+    row.addEventListener('dragleave', () => _clearDragClasses(row));
+    row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const dragged = e.dataTransfer.getData('text/plain');
+        const r = row.getBoundingClientRect();
+        const before = (e.clientY - r.top) < r.height / 2;
+        _clearDragClasses(row);
+        _smartDrop(dragged, o.id, before);
+    });
+}
+
+function _groupDragHandlers(row, g) {
+    row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', g.id); e.dataTransfer.effectAllowed = 'move'; });
+    row.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        const r = row.getBoundingClientRect();
+        const rel = (e.clientY - r.top) / r.height;
+        _clearDragClasses(row);
+        if (rel < 0.25) row.classList.add('dragover-top');
+        else if (rel > 0.75) row.classList.add('dragover-bottom');
+        else row.classList.add('dragover-into');
+    });
+    row.addEventListener('dragleave', () => _clearDragClasses(row));
+    row.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const dragged = e.dataTransfer.getData('text/plain');
+        if (dragged === g.id) { _clearDragClasses(row); return; }
+        const r = row.getBoundingClientRect();
+        const rel = (e.clientY - r.top) / r.height;
+        _clearDragClasses(row);
+        if (rel >= 0.25 && rel <= 0.75) {
+            // Drop INTO group — add dragged layer to this group
+            const draggedObj = getObj(dragged);
+            if (draggedObj && draggedObj.type !== 'group') {
+                setGroupOf(dragged, g.id);
+            }
+        } else {
+            reorderLayer(dragged, g.id, rel < 0.25);
+        }
+    });
+}
+
+function _makeLayerRow(o, i, inGroup) {
+    const sel = state.selection.includes(o.id);
+    const hue = inGroup ? groupHueOf(o.id) : null;
+    const accentStyle = hue != null ? `border-left-color: hsl(${hue},55%,48%) !important; background: hsla(${hue},40%,18%,.18);` : '';
+    const row = el('div', {
+        class: 'layer' + (inGroup ? ' group-child' : '') + (sel ? ' selected' : '') + (o.visible ? '' : ' is-hidden') + (o.locked ? ' locked' : ''),
+        'data-id': o.id, draggable: 'true', style: accentStyle
+    });
+    if (inGroup) row.append(el('span', { class: 'layer-indent' }));
+    const ico = layerThumb(o);
+    const nm = el('span', { class: 'nm', text: o.name });
+    nm.addEventListener('dblclick', (e) => { e.stopPropagation(); beginRename(nm, o); });
+    const keyChip = (o.type === 'text' && o.key) ? el('span', { class: 'key-chip', text: o.key, title: 'Loc key: ' + o.key }) : null;
+    const vis = el('span', { class: 'vis', text: o.visible ? '👁' : '⌀', title: 'Show/Hide' });
+    vis.addEventListener('click', (e) => { e.stopPropagation(); toggleVis(o.id); });
+    const lock = el('span', { class: 'lock', text: o.locked ? '🔒' : '🔓', title: 'Lock/Unlock' });
+    lock.addEventListener('click', (e) => { e.stopPropagation(); toggleLock(o.id); });
+    const del = el('span', { class: 'layer-del', text: '🗑', title: 'Delete layer' });
+    del.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const g = findGroupOf(o.id);
+        if (g) g.childIds = g.childIds.filter(id => id !== o.id);
+        const pg = curPage(); pg.objects = pg.objects.filter(obj => obj.id !== o.id);
+        state.selection = state.selection.filter(id => id !== o.id);
+        commit();
+    });
+    row.append(ico, nm);
+    if (keyChip) row.append(keyChip);
+    if (inGroup) {
+        const rmGrp = el('span', { class: 'gm-btn', text: '⊝', title: 'Remove from group' });
+        rmGrp.addEventListener('click', (e) => { e.stopPropagation(); removeFromGroup(o.id); });
+        row.append(rmGrp);
+    }
+    row.append(vis, lock, del);
+    row.addEventListener('click', (e) => layerClick(e, o, i));
+    _layerDragHandlers(row, o);
+    return row;
+}
+
+function _makeGroupRow(g, objs) {
+    const expanded = !state.groupCollapsed.has(g.id);
+    const sel = state.selection.includes(g.id);
+    const hue = g.hue ?? 200;
+    const groupStyle = `border-left: 3px solid hsl(${hue},55%,48%); background: hsla(${hue},30%,12%,.5);`;
+    const row = el('div', {
+        class: 'layer group-header' + (sel ? ' selected' : '') + (g.visible ? '' : ' is-hidden'),
+        'data-id': g.id, draggable: 'true', style: groupStyle
+    });
+    const expBtn = el('span', { class: 'layer-expand', text: expanded ? '▼' : '▶', title: expanded ? 'Collapse' : 'Expand' });
+    expBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (state.groupCollapsed.has(g.id)) state.groupCollapsed.delete(g.id); else state.groupCollapsed.add(g.id);
+        renderHierarchy();
+    });
+    const ico = el('span', { class: 'ico', text: '📁' });
+    const nm = el('span', { class: 'nm', text: g.name });
+    nm.addEventListener('dblclick', (e) => { e.stopPropagation(); beginRename(nm, g); });
+    const gmBtn = el('span', { class: 'gm-btn' + (g.groupMove ? ' active' : ''), text: '🔗', title: g.groupMove ? 'Group move ON — click to move layers independently' : 'Group move OFF — click to move layers together' });
+    gmBtn.addEventListener('click', (e) => { e.stopPropagation(); g.groupMove = !g.groupMove; commit(); });
+    const vis = el('span', { class: 'vis', text: g.visible ? '👁' : '⌀', title: 'Show/Hide group' });
+    vis.addEventListener('click', (e) => { e.stopPropagation(); toggleGroupVis(g); });
+    const del = el('span', { class: 'layer-del', text: '🗑', title: 'Delete group and all its layers' });
+    del.addEventListener('click', (e) => { e.stopPropagation(); deleteGroup(g.id); });
+    row.append(expBtn, ico, nm, gmBtn, vis, del);
+    row.addEventListener('click', (e) => { e.stopPropagation(); state.selection = [g.id]; refreshSelectionUI(); });
+    _groupDragHandlers(row, g);
+    return { row, expanded };
+}
+
 function renderHierarchy() {
     const list = $('#layer-list');
     list.innerHTML = '';
     const objs = curObjects();
     if (!objs.length) {
-        list.append(el('div', { class: 'empty-hint', html: 'No layers yet.<br>Use <b>+ Text / + Image</b> to add objects.<br><span class="mini">An image with no asset becomes a color / gradient / checker fill.</span>' }));
+        list.append(el('div', { class: 'empty-hint', html: 'No layers yet.<br>Use <b>+ Text / + Image / + Group</b> to add.<br><span class="mini">An image with no asset becomes a color / gradient / checker fill.</span>' }));
         return;
     }
+    // Build set of ids that are children of a group (skip in top-level iteration)
+    const childSet = new Set();
+    for (const o of objs) { if (o.type === 'group' && o.childIds) for (const cid of o.childIds) childSet.add(cid); }
+
     for (let i = objs.length - 1; i >= 0; i--) {
         const o = objs[i];
-        const sel = state.selection.includes(o.id);
-        const row = el('div', {
-            class: 'layer' + (sel ? ' selected' : '') + (o.visible ? '' : ' is-hidden') + (o.locked ? ' locked' : ''),
-            'data-id': o.id, draggable: 'true'
-        });
-        const ico = layerThumb(o);
-        const nm = el('span', { class: 'nm', text: o.name });
-        nm.addEventListener('dblclick', (e) => { e.stopPropagation(); beginRename(nm, o); });
-        const keyChip = (o.type === 'text' && o.key) ? el('span', { class: 'key-chip', text: o.key, title: 'Loc key: ' + o.key }) : null;
-        const vis = el('span', { class: 'vis', text: o.visible ? '👁' : '⌀', title: 'Show/Hide' });
-        vis.addEventListener('click', (e) => { e.stopPropagation(); toggleVis(o.id); });
-        const lock = el('span', { class: 'lock', text: o.locked ? '🔒' : '🔓', title: 'Lock/Unlock' });
-        lock.addEventListener('click', (e) => { e.stopPropagation(); toggleLock(o.id); });
-        const del = el('span', { class: 'layer-del', text: '🗑', title: 'Delete layer' });
-        del.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const pg = curPage();
-            pg.objects = pg.objects.filter(obj => obj.id !== o.id);
-            state.selection = state.selection.filter(id => id !== o.id);
-            commit();
-        });
-        row.append(ico, nm);
-        if (keyChip) row.append(keyChip);
-        row.append(vis, lock, del);
-        row.addEventListener('click', (e) => layerClick(e, o, i));
-        // drag reorder
-        row.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', o.id); e.dataTransfer.effectAllowed = 'move'; });
-        row.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            const r = row.getBoundingClientRect();
-            const top = (e.clientY - r.top) < r.height / 2;
-            row.classList.toggle('dragover-top', top);
-            row.classList.toggle('dragover-bottom', !top);
-        });
-        row.addEventListener('dragleave', () => row.classList.remove('dragover-top', 'dragover-bottom'));
-        row.addEventListener('drop', (e) => {
-            e.preventDefault();
-            const dragged = e.dataTransfer.getData('text/plain');
-            const r = row.getBoundingClientRect();
-            const before = (e.clientY - r.top) < r.height / 2; // before in display = above = higher z
-            row.classList.remove('dragover-top', 'dragover-bottom');
-            reorderLayer(dragged, o.id, before);
-        });
-        list.append(row);
+        if (childSet.has(o.id)) continue;
+        if (o.type === 'group') {
+            const { row, expanded } = _makeGroupRow(o, objs);
+            list.append(row);
+            if (expanded && o.childIds && o.childIds.length) {
+                const children = o.childIds.map(cid => objs.find(x => x.id === cid)).filter(Boolean);
+                children.sort((a, b) => objs.indexOf(b) - objs.indexOf(a));
+                for (const c of children) list.append(_makeLayerRow(c, objs.indexOf(c), true));
+            }
+        } else {
+            list.append(_makeLayerRow(o, i, false));
+        }
     }
 }
 function layerClick(e, o, idx) {
@@ -2346,6 +2530,24 @@ function reorderLayer(draggedId, targetId, before) {
     if (before) ti = ti + 1;
     objs.splice(ti, 0, moved);
     commit();
+}
+
+function _smartDrop(draggedId, targetId, before) {
+    if (draggedId === targetId) return;
+    const draggedObj = getObj(draggedId);
+    if (!draggedObj || draggedObj.type === 'group') { reorderLayer(draggedId, targetId, before); return; }
+    const targetGroup = findGroupOf(targetId);
+    const draggedGroup = findGroupOf(draggedId);
+    if (targetGroup !== draggedGroup) {
+        if (draggedGroup) draggedGroup.childIds = draggedGroup.childIds.filter(id => id !== draggedId);
+        if (targetGroup && !targetGroup.childIds.includes(draggedId)) targetGroup.childIds.push(draggedId);
+    }
+    reorderLayer(draggedId, targetId, before);
+}
+
+function groupHueOf(objId) {
+    const g = findGroupOf(objId);
+    return g ? (g.hue ?? 200) : null;
 }
 
 /* ----------------------------- Inspector -------------------------------- */
@@ -2443,6 +2645,34 @@ function seg(obj, prop, options) {
     return wrap;
 }
 
+function renderGroupInspector(host, g) {
+    const objs = curObjects();
+    const children = (g.childIds || []).map(id => objs.find(o => o.id === id)).filter(Boolean);
+    host.append(
+        group('Group', 'grp-main', [
+            row('Name', bindText(g, 'name')),
+            bindCheck(g, 'groupMove', 'Move children together (🔗)'),
+            el('div', { class: 'mini', style: 'margin-top:6px', text: children.length + ' layer(s) in this group' })
+        ]),
+        group('Actions', 'grp-actions', [
+            el('button', { text: 'Ungroup (keep layers)', onclick: () => ungroupGroup(g.id) }),
+            el('button', { class: 'danger', style: 'margin-top:6px', text: 'Delete group + all layers', onclick: () => deleteGroup(g.id) })
+        ])
+    );
+}
+
+function _groupMembershipSection(host, o) {
+    const objs = curObjects();
+    const groups = objs.filter(x => x.type === 'group');
+    if (!groups.length) return;
+    const curGrp = findGroupOf(o.id);
+    const opts = [{ value: '', label: '— none —' }].concat(groups.map(g => ({ value: g.id, label: g.name })));
+    const sel = el('select');
+    for (const op of opts) { const opt = el('option', { value: op.value }, op.label); if (op.value === (curGrp ? curGrp.id : '')) opt.selected = true; sel.append(opt); }
+    sel.addEventListener('change', () => setGroupOf(o.id, sel.value || null));
+    host.append(group('Group membership', 'grp-mem', [row('Group', sel)]));
+}
+
 function renderInspector() {
     const host = $('#inspector');
     host.innerHTML = '';
@@ -2451,8 +2681,10 @@ function renderInspector() {
     if (!sel.length) { renderBackgroundInspector(host); return; }
     if (sel.length > 1) { renderMultiInspector(host, sel); return; }
     const o = sel[0];
+    if (o.type === 'group') { renderGroupInspector(host, o); return; }
     if (o.type === 'text') renderTextInspector(host, o);
     else if (o.type === 'image') renderImageInspector(host, o);
+    _groupMembershipSection(host, o);
 }
 
 /* Shown when nothing is selected: edit the current page's background fill. */
@@ -2862,8 +3094,6 @@ function renderImageInspector(host, o) {
             bindCheck(o.nineSlice, 'enabled', 'Enable 9-slice scaling'),
             ...(o.nineSlice.enabled ? [
                 el('div', { class: 'mini', text: 'Corners stay fixed; edges + center stretch.' }),
-                row('Inner img', bindSelect(o, 'innerAssetId', imgOpts, { nullable: true })),
-                el('div', { class: 'mini', text: 'Inner image (optional) fills only the stretched center.' }),
                 nineSliceEditor(o)
             ] : [])
         ]),
@@ -3807,10 +4037,11 @@ function slug(s) { return String(s).trim().toLowerCase().replace(/[^a-z0-9._-]+/
 function toBlobAsync(canvas, mime, quality) {
     return new Promise((res) => canvas.toBlob((b) => res(b), mime, quality));
 }
-async function renderPageToBlob(page, lang, fmt, quality) {
+async function renderPageToBlob(page, lang, fmt, quality, scale = 1) {
     const res = pageResolution(page);
-    const c = document.createElement('canvas'); c.width = res.width; c.height = res.height;
+    const c = document.createElement('canvas'); c.width = Math.round(res.width * scale); c.height = Math.round(res.height * scale);
     const ctx = c.getContext('2d');
+    if (scale !== 1) ctx.scale(scale, scale);
     const bgFallback = (fmt.mime === 'image/jpeg' && !page.bgOn) ? '#ffffff' : null;
     renderPageToCtx(ctx, page, lang, { bgFallback });
     const blob = await toBlobAsync(c, fmt.mime, quality);
@@ -3887,6 +4118,21 @@ function openExportWizard() {
         pageWrap.append(el('label', {}, c, ' ' + pg.name));
     });
 
+    // resolution scale
+    const initScale = Math.round((es.scale || 1) * 100);
+    const scaleSlider = el('input', { type: 'range', min: 1, max: 100, step: 1, value: initScale });
+    const scaleBadge = el('span', { class: 'val-badge', text: initScale + '%' });
+    const scaleDims = el('span', { class: 'mini', style: 'color:var(--text-dim)' });
+    function updateScaleDims() {
+        const pg = state.project.pages.find(p => pageChecks[p.id] && pageChecks[p.id].checked);
+        if (!pg) { scaleDims.textContent = ''; return; }
+        const res = pageResolution(pg); const s = parseInt(scaleSlider.value) / 100;
+        scaleDims.textContent = '  ' + Math.round(res.width * s) + ' × ' + Math.round(res.height * s) + ' px';
+    }
+    scaleSlider.addEventListener('input', () => { scaleBadge.textContent = scaleSlider.value + '%'; updateScaleDims(); updateExample(); });
+    const scaleRow = el('div', { class: 'row' }, el('label', { text: 'Resolution' }), el('div', { class: 'ctl' }, scaleSlider, scaleBadge, scaleDims));
+    updateScaleDims();
+
     const example = el('div', { class: 'mini', style: 'margin-top:8px;white-space:pre-line;color:var(--accent-color)' });
     const progress = el('div', { class: 'progress', style: 'display:none' }, el('div'));
 
@@ -3917,6 +4163,7 @@ function openExportWizard() {
         el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '3 · Language organization' })), orgWrap,
         el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '4 · Languages' })), langWrap,
         el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '5 · Pages' })), pageWrap,
+        el('div', { class: 'panel-head', style: 'position:static;border:none;padding:14px 0 6px' }, el('span', { text: '6 · Resolution' })), scaleRow,
         example, progress);
 
     const runBtn = el('button', { class: 'primary', text: '⬇ Export ZIP' });
@@ -3926,9 +4173,10 @@ function openExportWizard() {
         const pages = state.project.pages.filter(p => pageChecks[p.id].checked);
         if (!pages.length || !sl.length) { toast('Select at least one page and language', 'warn'); return; }
         const withSuffix = suffixChk.checked || (org === 'flat' && sl.length > 1);
+        const exportScale = parseInt(scaleSlider.value) / 100;
         // persist settings
         es.format = fmtKey; es.quality = parseFloat(quality.value); es.naming = suffixChk.checked ? 'suffix' : 'plain';
-        es.organize = org; es.languages = langs.length ? sl.slice() : null;
+        es.organize = org; es.languages = langs.length ? sl.slice() : null; es.scale = exportScale;
 
         runBtn.disabled = true; progress.style.display = '';
         const bar = progress.firstChild;
@@ -3937,7 +4185,7 @@ function openExportWizard() {
         try {
             for (const pg of pages) {
                 for (const lang of sl) {
-                    const data = await renderPageToBlob(pg, lang, fmt, es.quality);
+                    const data = await renderPageToBlob(pg, lang, fmt, es.quality, exportScale);
                     let name = exportFilename(pg.name, lang, withSuffix, fmt.ext);
                     let path = (org === 'folders' && lang !== '__key' ? slug(lang) + '/' : '') + name;
                     if (seen.has(path)) { path = path.replace('.' + fmt.ext, '_' + slug(pg.id).slice(-4) + '.' + fmt.ext); }
@@ -3987,7 +4235,8 @@ function migrateProject(p) {
     p.localization.files = p.localization.files || [];
     p.fontAssignment = p.fontAssignment || { global: null, perLanguage: {} };
     p.fontAssignment.perLanguage = p.fontAssignment.perLanguage || {};
-    p.exportSettings = p.exportSettings || { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null };
+    p.exportSettings = p.exportSettings || { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null, scale: 1 };
+    p.exportSettings.scale = p.exportSettings.scale || 1;
     if (!Array.isArray(p.pages) || !p.pages.length) p.pages = [newPage('Page 1', 1920, 1080)];
     for (const pg of p.pages) {
         pg.id = pg.id || uid('page');
@@ -4172,6 +4421,7 @@ function setupToolbar() {
     $('#btn-redo').onclick = redo;
     $('#btn-add-text').onclick = addText;
     $('#btn-add-image').onclick = () => addImage();
+    $('#btn-add-group').onclick = addGroup;
     $('#btn-zoom-in').onclick = () => setZoom(state.zoom * 1.15);
     $('#btn-zoom-out').onclick = () => setZoom(state.zoom / 1.15);
     $('#btn-zoom-fit').onclick = fitToScreen;
