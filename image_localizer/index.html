@@ -190,6 +190,9 @@
         .page-tab .pt-name[contenteditable] { outline: none; }
         .page-tab .pt-close { opacity: .5; padding: 0 2px; border-radius: 2px; }
         .page-tab .pt-close:hover { opacity: 1; color: var(--danger); }
+        .page-tab[draggable] { cursor: grab; }
+        .page-tab.drag-over-left  { border-left:  2px solid var(--primary-color); }
+        .page-tab.drag-over-right { border-right: 2px solid var(--primary-color); }
         .page-add { padding: 7px 10px; cursor: pointer; color: var(--text-dim); background: transparent; border: none; }
         .page-add:hover { color: #fff; background: transparent; }
 
@@ -349,7 +352,7 @@
     <div id="app">
         <!-- TOOLBAR -->
         <div class="topbar">
-            <div class="brand"><span class="logo">🌐</span><span>Image Localizer</span></div>
+            <div class="brand"><a href="https://cenullum.com" title="cenullum.com — Home" style="display:inline-flex;align-items:center;padding:3px 8px;margin-right:4px;border:1px solid var(--border);border-radius:3px;font-size:11px;font-weight:600;color:var(--accent-color);text-decoration:none;transition:all .2s" onmouseover="this.style.borderColor='var(--primary-color)';this.style.color='var(--text-light)'" onmouseout="this.style.borderColor='var(--border)';this.style.color='var(--accent-color)'">⌂ Home</a><span class="logo">🌐</span><span>Image Localizer</span></div>
             <div class="tb-group">
                 <button id="btn-new" title="New project">New</button>
                 <button id="btn-open" title="Open project (.licproj)">Open</button>
@@ -395,9 +398,7 @@
                         <div class="layer-list" id="layer-list"></div>
                     </div>
                     <div class="dock-panel" id="panel-assets">
-                        <div class="panel-head">
-                            <div class="actions"><button id="asset-import">Import</button></div>
-                        </div>
+                        <div class="panel-head"></div>
                         <div class="dropzone" id="asset-drop">Drop images here or click to import<br><span class="mini">PNG · JPG · WebP · SVG</span><br><span class="mini" style="display:block;margin-top:6px;line-height:1.5;opacity:.85">Tip: name files <b>name_en.png</b>, <b>name_tr.png</b>, … and they group into one language set. The variant matching the current language is used automatically in preview &amp; export (falls back to the assigned one if a language is missing).</span></div>
                         <div class="asset-grid" id="asset-grid"></div>
                     </div>
@@ -2544,14 +2545,39 @@ function openLegalPanel() {
 async function importAssets(fileList) {
     const files = Array.from(fileList).filter(f => /^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|svg)$/i.test(f.name));
     if (!files.length) { toast('No image files', 'warn'); return; }
+    const imgs = state.project.assets.images;
+    /* Find duplicates upfront so we can ask once per unique name. */
+    const dupeNames = new Set(files.map(f => f.name).filter(n => Object.values(imgs).some(a => a.name === n)));
+    /* Ask overwrite per duplicate name (only once each even if somehow selected twice). */
+    const overwriteYes = new Set();
+    for (const name of dupeNames) {
+        if (confirm('An image named "' + name + '" already exists.\nOverwrite it?')) overwriteYes.add(name);
+    }
+    let added = 0, overwritten = 0, skipped = 0;
     for (const f of files) {
-        const data = await readFileAsDataURL(f);
-        const id = uid('img');
-        state.project.assets.images[id] = { name: f.name, type: f.type || 'image/png', data };
+        const existingId = Object.keys(imgs).find(id => imgs[id].name === f.name);
+        if (existingId) {
+            if (overwriteYes.has(f.name)) {
+                imgs[existingId].data = await readFileAsDataURL(f);
+                imgs[existingId].type = f.type || imgs[existingId].type;
+                /* Invalidate caches so the new image renders. */
+                delete state.imageCache[existingId];
+                _assetGroupCache = null; _nsCache.delete(existingId);
+                overwritten++;
+            } else { skipped++; }
+        } else {
+            const data = await readFileAsDataURL(f);
+            imgs[uid('img')] = { name: f.name, type: f.type || 'image/png', data };
+            added++;
+        }
     }
     ensureAssetsLoaded();
     commit();
-    toast(files.length + ' image' + (files.length > 1 ? 's' : '') + ' imported', 'ok');
+    const parts = [];
+    if (added)      parts.push(added + ' added');
+    if (overwritten) parts.push(overwritten + ' overwritten');
+    if (skipped)    parts.push(skipped + ' skipped');
+    toast(parts.join(', '), 'ok');
 }
 function deleteAsset(id) {
     const a = state.project.assets.images[id];
@@ -2681,8 +2707,12 @@ function openAssetGallery(groupKey) {
 /* ----------------------------- Page tabs -------------------------------- */
 function renderPageTabs() {
     const bar = $('#page-tabs'); bar.innerHTML = '';
+    let dragSrcId = null;
+
+    function clearDragStyles() { bar.querySelectorAll('.drag-over-left,.drag-over-right').forEach(t => { t.classList.remove('drag-over-left','drag-over-right'); }); }
+
     state.project.pages.forEach((pg) => {
-        const tab = el('div', { class: 'page-tab' + (pg.id === state.pageId ? ' active' : ''), 'data-id': pg.id });
+        const tab = el('div', { class: 'page-tab' + (pg.id === state.pageId ? ' active' : ''), 'data-id': pg.id, draggable: 'true' });
         const name = el('span', { class: 'pt-name', text: pg.name });
         name.addEventListener('dblclick', (e) => { e.stopPropagation(); beginPageRename(name, pg); });
         tab.append(name);
@@ -2691,7 +2721,40 @@ function renderPageTabs() {
             close.addEventListener('click', (e) => { e.stopPropagation(); deletePage(pg.id); });
             tab.append(close);
         }
+        /* Select on click (only if not dragging). */
         tab.addEventListener('click', () => selectPage(pg.id));
+
+        /* Drag-to-reorder. */
+        tab.addEventListener('dragstart', (e) => {
+            dragSrcId = pg.id;
+            e.dataTransfer.effectAllowed = 'move';
+            e.dataTransfer.setData('text/plain', pg.id);
+            setTimeout(() => tab.style.opacity = '0.4', 0);
+        });
+        tab.addEventListener('dragend', () => { tab.style.opacity = ''; clearDragStyles(); dragSrcId = null; });
+        tab.addEventListener('dragover', (e) => {
+            if (!dragSrcId || dragSrcId === pg.id) return;
+            e.preventDefault(); e.dataTransfer.dropEffect = 'move';
+            clearDragStyles();
+            const mid = tab.getBoundingClientRect().left + tab.offsetWidth / 2;
+            tab.classList.add(e.clientX < mid ? 'drag-over-left' : 'drag-over-right');
+        });
+        tab.addEventListener('dragleave', () => clearDragStyles());
+        tab.addEventListener('drop', (e) => {
+            e.preventDefault(); clearDragStyles();
+            if (!dragSrcId || dragSrcId === pg.id) return;
+            const pages = state.project.pages;
+            const fromIdx = pages.findIndex(p => p.id === dragSrcId);
+            let toIdx = pages.findIndex(p => p.id === pg.id);
+            if (fromIdx < 0 || toIdx < 0) return;
+            const mid = tab.getBoundingClientRect().left + tab.offsetWidth / 2;
+            if (e.clientX >= mid) toIdx++;       // drop after target
+            if (toIdx > fromIdx) toIdx--;        // account for removal
+            const [moved] = pages.splice(fromIdx, 1);
+            pages.splice(toIdx, 0, moved);
+            commit(); renderPageTabs();
+        });
+
         bar.append(tab);
     });
     const add = el('button', { class: 'page-add', text: '+ Page', title: 'New page', onclick: addPage });
@@ -3552,7 +3615,6 @@ function setupToolbar() {
     $('#lyr-up').onclick = () => moveLayer('up');
     $('#lyr-down').onclick = () => moveLayer('down');
     $('#lyr-dup').onclick = duplicateSelection;
-    $('#asset-import').onclick = async () => importAssets(await pickFiles('image/*', true));
 
     $('#preview-lang').addEventListener('change', (e) => { state.previewLang = e.target.value; renderCanvas(); renderInspector(); });
     $('#btn-page-res').onclick = openResolutionEditor;
