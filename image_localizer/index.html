@@ -157,7 +157,7 @@
             border-radius: 2px; display: block; }
         .asset .nm { font-size: 10px; margin-top: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-dim); }
         .asset .sub { font-size: 9px; margin-top: 1px; color: var(--text-mute); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .asset .del { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.6); border: none; border-radius: 2px; padding: 1px 5px; font-size: 11px; opacity: 0; }
+        .asset .del { position: absolute; top: 2px; right: 2px; background: rgba(0,0,0,.6); border: none; border-radius: 2px; padding: 1px 5px; font-size: 11px; opacity: 0; z-index: 10; }
         .asset:hover .del { opacity: 1; }
         /* Language-variant group: stacked "many images" look + count badge */
         .asset.group { cursor: pointer; }
@@ -1071,6 +1071,69 @@ function resolveText(obj, lang) {
 function isMissingLoc(obj, lang) {
     if (lang === '__key' || !lang || !obj.key) return false;
     return locValue(obj.key, lang) == null;
+}
+/* Write a value into the localization files for key+lang.
+   Writes to the last file that owns the key (highest priority = last wins).
+   If no file has the key yet, writes to the last file (or creates one). */
+function setLocValue(key, lang, value) {
+    if (!key || !lang || lang === '__key') return;
+    const files = state.project.localization.files;
+    let target = null;
+    for (const f of files) if (f.data[key]) target = f;
+    if (!target) {
+        if (!files.length) return;
+        target = files[files.length - 1];
+        if (!target.data[key]) { target.data[key] = {}; if (!target.keys.includes(key)) target.keys.push(key); }
+    }
+    target.data[key][lang] = value;
+    if (!target.languages.includes(lang)) target.languages.push(lang);
+}
+/* Merge all loaded localization files into one Format-A JSON and download it. */
+function _mergedLocLangs() {
+    const set = new Set();
+    for (const f of state.project.localization.files) for (const l of f.languages) set.add(l);
+    return Array.from(set);
+}
+function _doExportLocJSONA() {
+    const keys = allLocKeys(), langs = _mergedLocLangs();
+    const out = {};
+    for (const k of keys) { out[k] = {}; for (const l of langs) { const v = locValue(k,l); if (v!=null) out[k][l]=v; } }
+    downloadBlob(new Blob([JSON.stringify(out, null, 2)], {type:'application/json'}), 'localization.json');
+    toast('Exported JSON A — ' + keys.length + ' keys · ' + langs.length + ' languages', 'ok');
+}
+function _doExportLocJSONB() {
+    const keys = allLocKeys(), langs = _mergedLocLangs();
+    const out = {};
+    for (const l of langs) { out[l]={}; for (const k of keys) { const v=locValue(k,l); if(v!=null) out[l][k]=v; } }
+    downloadBlob(new Blob([JSON.stringify(out, null, 2)], {type:'application/json'}), 'localization_B.json');
+    toast('Exported JSON B — ' + langs.length + ' languages · ' + keys.length + ' keys', 'ok');
+}
+function _doExportLocCSV() {
+    const keys = allLocKeys(), langs = _mergedLocLangs();
+    function esc(s){ s=String(s||''); return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+    const rows = [['key',...langs].map(esc).join(',')];
+    for (const k of keys) rows.push([esc(k),...langs.map(l=>esc(locValue(k,l)||''))].join(','));
+    downloadBlob(new Blob([rows.join('\n')], {type:'text/csv'}), 'localization.csv');
+    toast('Exported CSV — ' + keys.length + ' keys · ' + langs.length + ' languages', 'ok');
+}
+function exportMergedLocalization() {
+    const keys = allLocKeys();
+    if (!keys.length) { toast('No localization data to export', 'warn'); return; }
+    const back = $('#modal-generic');
+    const btn = (label, desc, fn) => el('button', {
+        style: 'display:block;width:100%;text-align:left;padding:10px 14px;margin-bottom:8px;border:1px solid var(--border);border-radius:var(--radius);background:var(--surface-2);cursor:pointer',
+        onclick: () => { closeModal(back); fn(); }
+    },
+        el('span', { style: 'font-weight:600;color:var(--text-light)', text: label }),
+        el('span', { style: 'display:block;font-size:11px;color:var(--text-mute);margin-top:3px', text: desc })
+    );
+    const body = el('div', { style: 'width:360px' },
+        btn('JSON — Format A', '{ "key": { "en": "…", "tr": "…" } }  →  localization.json', _doExportLocJSONA),
+        btn('JSON — Format B', '{ "en": { "key": "…" }, "tr": { … } }  →  localization_B.json', _doExportLocJSONB),
+        btn('CSV', '"key","en","tr",…  →  localization.csv', _doExportLocCSV)
+    );
+    openModal(back, '⬇ Export Localization — Choose Format', body,
+        [el('button', { text: 'Cancel', onclick: () => closeModal(back) })], 'sm');
 }
 
 /* ------------------------------ Fonts ---------------------------------- */
@@ -2215,6 +2278,14 @@ function renderTextInspector(host, o) {
     host.append(
         group('Content', 'content', [
             row('Loc Key', bindSelect(o, 'key', keyOpts, { nullable: false })),
+            (state.previewLang !== '__key' && o.key) ? (function() {
+                const lang = state.previewLang;
+                const ta = el('textarea');
+                ta.value = locValue(o.key, lang) || '';
+                ta.addEventListener('input', () => { setLocValue(o.key, lang, ta.value); requestCanvas(); });
+                ta.addEventListener('change', () => { setLocValue(o.key, lang, ta.value); commit(); });
+                return field('Current Text (' + lang.toUpperCase() + ')', ta);
+            })() : null,
             field('Fallback text', bindText(o, 'fallback', { area: true })),
             el('div', { class: 'mini', html: 'Preview: <b>' + escapeHtml(previewVal || '∅') + '</b>' })
         ]),
@@ -2683,18 +2754,37 @@ function openAssetGallery(groupKey) {
         const a = imgs[id];
         const lang = parseAssetLang(a.name).lang;
         const active = (resolveAssetForLang(g.ids[0], state.previewLang) === id) && state.previewLang !== '__key';
-        const tile = el('div', {
-            class: 'gal-tile', title: 'Double-click to add to the canvas',
-            style: 'background:var(--surface-2);border:1px solid ' + (active ? 'var(--primary-color)' : 'var(--border)')
-                + ';border-radius:var(--radius);padding:8px;text-align:center;'
+        const delBtn = el('button', {
+            style: 'position:absolute;top:4px;right:4px;background:rgba(0,0,0,.7);border:none;border-radius:2px;'
+                + 'padding:1px 6px;font-size:11px;color:#fff;cursor:pointer;opacity:0;transition:opacity .15s;z-index:5',
+            text: '✕', title: 'Remove from project'
+        });
+        const wrap = el('div', {
+            class: 'gal-tile',
+            style: 'position:relative;background:var(--surface-2);border:1px solid ' + (active ? 'var(--primary-color)' : 'var(--border)')
+                + ';border-radius:var(--radius);padding:8px;text-align:center;transition:border-color .15s'
         },
             el('img', { src: a.data, draggable: 'false', style: 'width:100%;height:96px;object-fit:contain;background:#0a0a0a;border-radius:3px;display:block' }),
             el('div', { style: 'font-weight:600;margin-top:6px;font-size:12px;color:var(--text-light)', text: lang ? langDisplayName(lang) : 'Default' }),
             el('div', { class: 'mini', style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap', text: a.name }),
-            active ? el('div', { class: 'mini', style: 'color:var(--primary-color);margin-top:2px', text: '● used for current preview' }) : null
+            active ? el('div', { class: 'mini', style: 'color:var(--primary-color);margin-top:2px', text: '● used for current preview' }) : null,
+            delBtn
         );
-        tile.addEventListener('dblclick', () => { addImage(id); toast('Added ' + a.name, '', 1500); });
-        grid.append(tile);
+        wrap.addEventListener('mouseenter', () => { delBtn.style.opacity = '1'; });
+        wrap.addEventListener('mouseleave', () => { delBtn.style.opacity = '0'; });
+        delBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            deleteAsset(id);
+            if (!state.project.assets.images[id]) {
+                // was actually deleted — refresh gallery or close
+                _assetGroupCache = null;
+                const remaining = g.ids.filter(x => x !== id && state.project.assets.images[x]);
+                if (remaining.length > 0) openAssetGallery(groupKey);
+                else closeModal($('#modal-generic'));
+            }
+        });
+        wrap.addEventListener('dblclick', () => { addImage(id); toast('Added ' + a.name, '', 1500); });
+        grid.append(wrap);
     }
     const body = el('div', { style: 'max-width:640px' },
         el('div', { class: 'mini', style: 'margin-bottom:12px', text: 'All "' + g.base + '" language variants. The matching one is chosen automatically per language in preview & export. Double-click a tile to add it to the canvas.' }),
@@ -3004,11 +3094,13 @@ function openLocManager() {
 
     const summary = el('div', { class: 'mini', style: 'margin:6px 0 12px' }, `${files.length} file(s) · ${langs.length} language(s) [${langs.join(', ') || '—'}] · ${totalKeys} unique key(s)`);
 
-    const dropHint = el('div', { class: 'help', style: 'border:1.5px dashed var(--border);border-radius:var(--radius);padding:10px 14px;text-align:center;margin-bottom:12px;transition:border-color .15s', text: 'Drop JSON / CSV files or a folder here, or use the button below' });
+    const dropHint = el('div', { class: 'help', style: 'border:1.5px dashed var(--border);border-radius:var(--radius);padding:12px 16px;text-align:center;margin-bottom:12px;transition:all .2s;cursor:pointer;font-size:12px;', text: 'Drop JSON / CSV files or a folder here, or click to browse' });
+    dropHint.addEventListener('mouseenter', () => { dropHint.style.borderColor='var(--primary-color)'; dropHint.style.background='var(--surface-2)'; dropHint.style.color='var(--text-light)'; dropHint.style.fontWeight='600'; dropHint.style.fontSize='13px'; });
+    dropHint.addEventListener('mouseleave', () => { dropHint.style.borderColor=''; dropHint.style.background=''; dropHint.style.color=''; dropHint.style.fontWeight=''; dropHint.style.fontSize='12px'; });
+    dropHint.addEventListener('click', async () => smartImportLoc(await pickFiles('.json,.csv', true)));
     const body = el('div', {},
         dropHint,
         el('div', { class: 'ctl', style: 'margin-bottom:12px;display:flex;flex-wrap:wrap;gap:10px' },
-            el('button', { class: 'primary', text: '＋ Import Localization', title: 'Import JSON (single-lang or multi-lang) or CSV — auto-detected', onclick: async () => smartImportLoc(await pickFiles('.json,.csv', true)) }),
             el('button', { text: '⬇ Sample JSON A', title: 'Format A — key-major: { key: { lang: value } }', onclick: downloadSampleJSONA }),
             el('button', { text: '⬇ Sample JSON B', title: 'Format B — language-major: { lang: { key: value } }', onclick: downloadSampleJSONB }),
             el('button', { text: '⬇ Sample Language', title: 'Download a single-language JSON example (en.json)', onclick: downloadSampleLangJSON }),
@@ -3024,7 +3116,10 @@ function openLocManager() {
         if (files.length) smartImportLoc(files); else toast('No JSON or CSV files found in drop', 'warn');
     });
 
-    openModal($('#modal-loc'), 'Localization Manager', body, [el('button', { text: 'Close', onclick: () => closeModal($('#modal-loc')) })], 'lg');
+    openModal($('#modal-loc'), 'Localization Manager', body, [
+        el('button', { class: 'primary', text: '⬇ Export Localization', title: 'Download all loaded localization as one merged JSON (Format A)', onclick: exportMergedLocalization }),
+        el('button', { text: 'Close', onclick: () => closeModal($('#modal-loc')) })
+    ], 'lg');
 }
 
 /* Format A — key-major: { key: { lang: value } } */
