@@ -221,7 +221,7 @@
             background-size: 24px 24px; background-position: 0 0, 0 12px, 12px -12px, -12px 0px; background-color: #080809;
         }
         .stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
-        .stage canvas { display: block; box-shadow: 0 0 0 1px var(--border), var(--shadow-lg); image-rendering: auto; }
+        .stage canvas { display: block; box-shadow: 0 0 0 1px var(--border), var(--shadow-lg); image-rendering: pixelated; }
         .overlay { position: absolute; inset: 0; pointer-events: none; }
         .sel-box { position: absolute; border: 1px solid var(--accent-color); pointer-events: none; box-sizing: border-box; }
         .sel-box.warn { border-color: var(--warn); }
@@ -261,8 +261,9 @@
         .row .ctl { flex: 1; display: flex; align-items: center; gap: 6px; min-width: 0; }
         .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
         .wh-row { display: grid; grid-template-columns: 1fr auto 1fr; gap: 4px; align-items: end; }
-        .ar-lock-btn { padding: 0 5px; height: 26px; line-height: 1; font-size: 13px; justify-content: center; background: transparent; border-color: var(--border); flex-shrink: 0; }
-        .ar-lock-btn.on { background: var(--surface-3); border-color: var(--primary-color); }
+        .ar-lock-btn { padding: 0 6px; height: 26px; line-height: 1; font-size: 11px; font-weight: 700; justify-content: center; background: rgba(192,86,75,.18); border-color: var(--danger); color: var(--danger); flex-shrink: 0; }
+        .ar-lock-btn:hover { background: rgba(192,86,75,.32) !important; border-color: var(--danger) !important; }
+        .ar-lock-btn.on { background: var(--ok) !important; border-color: var(--ok) !important; color: #0e1c0e !important; }
         .fit-btns { display: flex; gap: 4px; margin-top: 2px; }
         .fit-btns button { flex: 1; padding: 4px 2px; font-size: 10px; justify-content: center; }
         .field { display: flex; flex-direction: column; gap: 3px; }
@@ -665,7 +666,7 @@ const _GROUP_HUES = [200, 30, 140, 280, 355, 170, 60, 310, 90, 240];
 let _groupHueIdx = 0;
 function newGroupObject(name) {
     const hue = _GROUP_HUES[_groupHueIdx++ % _GROUP_HUES.length];
-    return { id: uid('grp'), type: 'group', name: name || 'Group', visible: true, locked: false, groupMove: true, childIds: [], hue };
+    return { id: uid('grp'), type: 'group', name: name || 'Group', visible: true, locked: false, groupMove: true, childIds: [], hue, gt: { x:0, y:0, rot:0, sx:1, sy:1 } };
 }
 function newImageObject(x, y, assetId, w, h) {
     return Object.assign(baseObj('image', 'Image', x, y, w || 400, h || 400), {
@@ -1713,13 +1714,26 @@ function drawImageObject(ctx, obj, lang) {
 function renderPageToCtx(ctx, page, lang, opts = {}) {
     const res = pageResolution(page);
     ctx.save();
+    ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, res.width, res.height);
     if (page.bgOn) paintFill(ctx, page.bgFill, 0, 0, res.width, res.height);
     else if (opts.bgFallback) { ctx.fillStyle = opts.bgFallback; ctx.fillRect(0, 0, res.width, res.height); }
     for (const obj of page.objects) {
         if (!obj.visible || obj.type === 'group') continue;
+        const grp = page.objects.find(g => g.type === 'group' && g.groupMove && g.childIds && g.childIds.includes(obj.id));
+        const useGT = grp && hasActiveGT(grp);
+        if (useGT) {
+            const pivot = computeGroupPivot(page, grp);
+            const { x: gx=0, y: gy=0, rot: gr=0, sx=1, sy=1 } = grp.gt;
+            ctx.save();
+            ctx.translate(pivot.x + gx, pivot.y + gy);
+            ctx.rotate(gr * D2R);
+            ctx.scale(sx, sy);
+            ctx.translate(-pivot.x, -pivot.y);
+        }
         if (obj.type === 'text') { const fit = drawTextObject(ctx, obj, lang); if (opts.fitOut) opts.fitOut[obj.id] = fit; }
         else if (obj.type === 'image') drawImageObject(ctx, obj, lang);
+        if (useGT) ctx.restore();
     }
     ctx.restore();
     ctx.filter = 'none';
@@ -1802,7 +1816,9 @@ function renderSelectionOverlay() {
 
     // handles only for a single, unlocked selection
     if (sel.length === 1 && !sel[0].locked) {
-        const obj = sel[0];
+        const rawObj = sel[0];
+        const grp0 = getObjGroup(rawObj.id);
+        const obj = (grp0 && hasActiveGT(grp0)) ? virtualObjWithGT(rawObj, grp0, computeGroupPivot(curPage(), grp0)) : rawObj;
         const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
         const ang = (obj.rotation || 0) * D2R;
 
@@ -1869,12 +1885,14 @@ function renderSelectionOverlay() {
 }
 
 function makeBox(obj, cls) {
-    const s = canvasToScreen(obj.x, obj.y);
+    const grp = getObjGroup(obj.id);
+    const vo = (grp && hasActiveGT(grp)) ? virtualObjWithGT(obj, grp, computeGroupPivot(curPage(), grp)) : obj;
+    const s = canvasToScreen(vo.x, vo.y);
     const b = el('div', { class: cls });
     b.style.left = s.x + 'px'; b.style.top = s.y + 'px';
-    b.style.width = (obj.width * state.zoom) + 'px';
-    b.style.height = (obj.height * state.zoom) + 'px';
-    if (obj.rotation) { b.style.transformOrigin = 'center'; b.style.transform = `rotate(${obj.rotation}deg)`; }
+    b.style.width = (vo.width * state.zoom) + 'px';
+    b.style.height = (vo.height * state.zoom) + 'px';
+    if (vo.rotation) { b.style.transformOrigin = 'center'; b.style.transform = `rotate(${vo.rotation}deg)`; }
     return b;
 }
 
@@ -1963,17 +1981,24 @@ function pointInObj(obj, x, y) {
     return p.x >= obj.x && p.x <= obj.x + obj.width && p.y >= obj.y && p.y <= obj.y + obj.height;
 }
 function hitTest(x, y) {
-    const objs = curObjects();
+    const pg = curPage(); const objs = pg.objects;
+    function testAt(o, hx, hy) {
+        const grp = getObjGroup(o.id, pg);
+        if (grp && hasActiveGT(grp)) {
+            const inv = inverseGTtoPoint(grp, computeGroupPivot(pg, grp), hx, hy);
+            return pointInObj(o, inv.x, inv.y);
+        }
+        return pointInObj(o, hx, hy);
+    }
     for (let i = objs.length - 1; i >= 0; i--) {
         const o = objs[i];
         if (o.type === 'group' || !o.visible || o.locked) continue;
-        if (pointInObj(o, x, y)) return o;
+        if (testAt(o, x, y)) return o;
     }
-    // second pass allow locked (so it can be selected even if not movable)
     for (let i = objs.length - 1; i >= 0; i--) {
         const o = objs[i];
         if (o.type === 'group' || !o.visible) continue;
-        if (pointInObj(o, x, y)) return o;
+        if (testAt(o, x, y)) return o;
     }
     return null;
 }
@@ -2048,7 +2073,14 @@ function setupCanvasInteraction() {
             } else if (!e.shiftKey) { drag.axisLock = null; }
             for (const it of drag.items) {
                 const o = getObj(it.id); if (!o) continue;
-                o.x = snapV(it.x + dx); o.y = snapV(it.y + dy);
+                let fdx = dx, fdy = dy;
+                const grp = getObjGroup(o.id);
+                if (grp && hasActiveGT(grp)) {
+                    const { rot: gr=0, sx=1, sy=1 } = grp.gt;
+                    const cos = Math.cos(-gr * D2R), sin = Math.sin(-gr * D2R);
+                    fdx = (cos*dx - sin*dy)/sx; fdy = (sin*dx + cos*dy)/sy;
+                }
+                o.x = snapV(it.x + fdx); o.y = snapV(it.y + fdy);
             }
             requestCanvas(); renderInspectorLight(); updateStatus();
         } else if (drag.mode === 'resize') {
@@ -2153,12 +2185,24 @@ function doResize(p) {
     if (drag.movesS) Bv = Math.max(Tv + MIN, dv);
     if (drag.movesN) Tv = Math.min(Bv - MIN, dv);
     let newW = Ru - Lu, newH = Bv - Tv;
-    // Aspect ratio lock: apply to corner handles only
-    const isCorner = (drag.movesE || drag.movesW) && (drag.movesN || drag.movesS);
-    if (state.arLocked && isCorner && state.arLockedRatio) {
+    // Aspect ratio lock: apply to ALL handles when locked
+    if (state.arLocked && state.arLockedRatio) {
         const r = state.arLockedRatio;
-        newH = Math.max(MIN, newW / r);
-        if (drag.movesS) Bv = Tv + newH; else Tv = Bv - newH;
+        const movesX = drag.movesE || drag.movesW;
+        const movesY = drag.movesN || drag.movesS;
+        if (movesX && movesY) {
+            // corner: height follows width
+            newH = Math.max(MIN, newW / r);
+            if (drag.movesS) Bv = Tv + newH; else Tv = Bv - newH;
+        } else if (movesX) {
+            // left/right edge only: adjust height symmetrically around center
+            newH = Math.max(MIN, newW / r);
+            Tv = -newH / 2; Bv = newH / 2;
+        } else if (movesY) {
+            // top/bottom edge only: adjust width symmetrically around center
+            newW = Math.max(MIN, newH * r);
+            Lu = -newW / 2; Ru = newW / 2;
+        }
     }
     const cu = (Lu + Ru) / 2, cv = (Tv + Bv) / 2;
     const nc = { x: c0.x + ux.x * cu + uy.x * cv, y: c0.y + ux.y * cu + uy.y * cv };
@@ -2302,6 +2346,10 @@ function addGroup() {
 }
 function removeFromGroup(objId) {
     const g = findGroupOf(objId); if (!g) return;
+    if (hasActiveGT(g)) {
+        const child = getObj(objId);
+        if (child) bakeGTintoChild(child, g, computeGroupPivot(curPage(), g));
+    }
     g.childIds = g.childIds.filter(id => id !== objId);
     commit();
 }
@@ -2323,6 +2371,11 @@ function deleteGroup(groupId) {
     commit();
 }
 function ungroupGroup(groupId) {
+    const g = getObj(groupId); if (!g || g.type !== 'group') return;
+    if (hasActiveGT(g)) {
+        const pg = curPage(); const pivot = computeGroupPivot(pg, g);
+        for (const cid of (g.childIds || [])) { const c = pg.objects.find(o => o.id === cid); if (c) bakeGTintoChild(c, g, pivot); }
+    }
     const pg = curPage();
     pg.objects = pg.objects.filter(o => o.id !== groupId);
     state.selection = state.selection.filter(id => id !== groupId);
@@ -2550,6 +2603,54 @@ function groupHueOf(objId) {
     return g ? (g.hue ?? 200) : null;
 }
 
+/* ---- Group transform math ---- */
+function computeGroupPivot(page, g) {
+    const cs = (g.childIds || []).map(id => page.objects.find(o => o.id === id)).filter(Boolean);
+    if (!cs.length) return { x: 0, y: 0 };
+    const xs = cs.flatMap(c => [c.x || 0, (c.x || 0) + (c.width || 0)]);
+    const ys = cs.flatMap(c => [c.y || 0, (c.y || 0) + (c.height || 0)]);
+    return { x: (Math.min(...xs) + Math.max(...xs)) / 2, y: (Math.min(...ys) + Math.max(...ys)) / 2 };
+}
+function hasActiveGT(g) {
+    if (!g || !g.gt) return false;
+    const { x=0, y=0, rot=0, sx=1, sy=1 } = g.gt;
+    return x !== 0 || y !== 0 || rot !== 0 || sx !== 1 || sy !== 1;
+}
+function applyGTtoPoint(g, pivot, wx, wy) {
+    const { x: gx=0, y: gy=0, rot: gr=0, sx=1, sy=1 } = g.gt || {};
+    const { x: px, y: py } = pivot;
+    const dx = wx - px, dy = wy - py;
+    const cos = Math.cos(gr * D2R), sin = Math.sin(gr * D2R);
+    return { x: px + gx + sx*(cos*dx - sin*dy), y: py + gy + sy*(sin*dx + cos*dy) };
+}
+function inverseGTtoPoint(g, pivot, wx, wy) {
+    const { x: gx=0, y: gy=0, rot: gr=0, sx=1, sy=1 } = g.gt || {};
+    const { x: px, y: py } = pivot;
+    const dx = wx - (px + gx), dy = wy - (py + gy);
+    const cos = Math.cos(-gr * D2R), sin = Math.sin(-gr * D2R);
+    return { x: (cos*dx - sin*dy)/sx + px, y: (sin*dx + cos*dy)/sy + py };
+}
+function getObjGroup(objId, page) {
+    const objs = (page || curPage()).objects;
+    return objs.find(o => o.type === 'group' && o.groupMove && o.childIds && o.childIds.includes(objId)) || null;
+}
+function bakeGTintoChild(child, g, pivot) {
+    if (!g.gt) return;
+    const nc = applyGTtoPoint(g, pivot, child.x + (child.width||0)/2, child.y + (child.height||0)/2);
+    const nw = (child.width||0) * (g.gt.sx||1);
+    const nh = (child.height||0) * (g.gt.sy||1);
+    child.x = nc.x - nw/2; child.y = nc.y - nh/2;
+    child.width = nw; child.height = nh;
+    child.rotation = ((child.rotation||0) + (g.gt.rot||0)) % 360;
+}
+/* Returns a virtual object with the group transform applied (for overlay/hit-test use) */
+function virtualObjWithGT(obj, g, pivot) {
+    const { sx=1, sy=1, rot: gr=0 } = g.gt || {};
+    const vc = applyGTtoPoint(g, pivot, obj.x + (obj.width||0)/2, obj.y + (obj.height||0)/2);
+    const vw = (obj.width||0)*sx, vh = (obj.height||0)*sy;
+    return { ...obj, x: vc.x - vw/2, y: vc.y - vh/2, width: vw, height: vh, rotation: ((obj.rotation||0)+gr) };
+}
+
 /* ----------------------------- Inspector -------------------------------- */
 state.inspCollapsed = new Set();
 const fmtNum = (n) => (Math.round((n || 0) * 100) / 100).toString();
@@ -2648,14 +2749,28 @@ function seg(obj, prop, options) {
 function renderGroupInspector(host, g) {
     const objs = curObjects();
     const children = (g.childIds || []).map(id => objs.find(o => o.id === id)).filter(Boolean);
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const gt = g.gt;
+    const transformRows = g.groupMove ? [
+        group('Transform', 'grp-gt', [
+            el('div', { class: 'mini', text: 'Applied on top of all children. Pivot = bounding box center.' }),
+            row('X', bindNum(gt, 'x', { step: 1 })),
+            row('Y', bindNum(gt, 'y', { step: 1 })),
+            row('Rotation°', bindNum(gt, 'rot', { step: 1 })),
+            row('Scale X', bindNum(gt, 'sx', { step: 0.01, min: 0.01 })),
+            row('Scale Y', bindNum(gt, 'sy', { step: 0.01, min: 0.01 })),
+            el('button', { text: 'Reset transform', onclick: () => { Object.assign(g.gt, {x:0,y:0,rot:0,sx:1,sy:1}); commit(); } })
+        ])
+    ] : [];
     host.append(
         group('Group', 'grp-main', [
             row('Name', bindText(g, 'name')),
-            bindCheck(g, 'groupMove', 'Move children together (🔗)'),
+            bindCheck(g, 'groupMove', 'Move + transform children together (🔗)'),
             el('div', { class: 'mini', style: 'margin-top:6px', text: children.length + ' layer(s) in this group' })
         ]),
+        ...transformRows,
         group('Actions', 'grp-actions', [
-            el('button', { text: 'Ungroup (keep layers)', onclick: () => ungroupGroup(g.id) }),
+            el('button', { text: 'Ungroup (bake & keep layers)', onclick: () => ungroupGroup(g.id) }),
             el('button', { class: 'danger', style: 'margin-top:6px', text: 'Delete group + all layers', onclick: () => deleteGroup(g.id) })
         ])
     );
@@ -2743,23 +2858,28 @@ function fillEditor(owner, key) {
 }
 
 function makeWHSection(o) {
-    let arLocked = false;
+    // Persist AR lock state on the object so it survives inspector rebuilds and save/load
+    let arLocked = o.arLocked || false;
     // lockedRatio is captured once when lock is turned ON and stays fixed — prevents ratio drift while typing
-    let lockedRatio = o.width / o.height;
+    let lockedRatio = o.arLockedRatio || (o.width / o.height);
+    // Sync global resize state with this object's setting immediately
+    state.arLocked = arLocked; state.arLockedRatio = lockedRatio;
 
     const wInp = el('input', { type: 'number', step: '1', min: '1', id: 'insp-w' });
     const hInp = el('input', { type: 'number', step: '1', min: '1', id: 'insp-h' });
     wInp.value = fmtNum(o.width);
     hInp.value = fmtNum(o.height);
 
-    const lockBtn = el('button', { class: 'ar-lock-btn', title: 'Lock aspect ratio', type: 'button' }, '🔓');
+    const lockBtn = el('button', { class: 'ar-lock-btn' + (arLocked ? ' on' : ''), title: arLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio', type: 'button' }, arLocked ? '🔒 AR' : '🔓 AR');
     lockBtn.addEventListener('click', () => {
         arLocked = !arLocked;
-        if (arLocked) { lockedRatio = o.width / o.height; state.arLocked = true; state.arLockedRatio = lockedRatio; }
-        else { state.arLocked = false; }
+        if (arLocked) { lockedRatio = o.width / o.height; }
+        o.arLocked = arLocked; o.arLockedRatio = lockedRatio;
+        state.arLocked = arLocked; state.arLockedRatio = lockedRatio;
         lockBtn.classList.toggle('on', arLocked);
-        lockBtn.textContent = arLocked ? '🔒' : '🔓';
+        lockBtn.textContent = arLocked ? '🔒 AR' : '🔓 AR';
         lockBtn.title = arLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio';
+        commit();
     });
 
     wInp.addEventListener('input', () => {
@@ -3497,27 +3617,37 @@ function beginPageRename(span, pg) {
 function openResolutionEditor() {
     const pg = curPage();
     const cur = pageResolution(pg);
-    const inherit = !pg.resolution;
+    const def = state.project.defaultResolution;
     const wInp = el('input', { type: 'number', min: 1, value: cur.width });
     const hInp = el('input', { type: 'number', min: 1, value: cur.height });
-    const inheritChk = el('input', { type: 'checkbox' }); inheritChk.checked = inherit;
-    const defChk = el('input', { type: 'checkbox' });
     const presets = [[1920, 1080], [1280, 720], [3840, 2160], [1024, 1024], [2048, 2048], [1080, 1920], [800, 600]];
     const presetWrap = el('div', { class: 'lang-pick' });
-    for (const [w, h] of presets) presetWrap.append(el('button', { text: w + '×' + h, onclick: () => { wInp.value = w; hInp.value = h; inheritChk.checked = false; } }));
+    for (const [w, h] of presets) presetWrap.append(el('button', { text: w + '×' + h, onclick: () => { wInp.value = w; hInp.value = h; } }));
+    const defLabel = el('span', { class: 'mini', style: 'color:var(--text-mute)', text: 'Project default: ' + def.width + '×' + def.height });
     const body = el('div', {},
-        el('label', { class: 'help', style: 'display:flex;align-items:center;gap:8px;margin-bottom:10px' }, inheritChk, ' Inherit project default (' + state.project.defaultResolution.width + '×' + state.project.defaultResolution.height + ')'),
         el('div', { class: 'row2' }, field('Width', wInp), field('Height', hInp)),
         el('div', { style: 'margin:12px 0 6px' }, el('div', { class: 'mini', text: 'Presets' }), presetWrap),
-        el('label', { class: 'help', style: 'display:flex;align-items:center;gap:8px;margin-top:10px' }, defChk, ' Also set as project default for new pages')
+        el('div', { style: 'margin-top:10px' }, defLabel)
     );
-    const save = el('button', { class: 'primary', text: 'Apply', onclick: () => {
+    const applyBtn = el('button', { class: 'primary', text: 'Apply' });
+    applyBtn.addEventListener('click', () => {
         const w = clamp(Math.round(+wInp.value || 1), 1, 16384), h = clamp(Math.round(+hInp.value || 1), 1, 16384);
-        if (inheritChk.checked) pg.resolution = null; else pg.resolution = { width: w, height: h };
-        if (defChk.checked) state.project.defaultResolution = { width: w, height: h };
+        // Auto-inherit: if values match project default, store null so new default propagates
+        const d = state.project.defaultResolution;
+        pg.resolution = (w === d.width && h === d.height) ? null : { width: w, height: h };
         closeModal($('#modal-generic')); commit(); fitToScreen();
-    }});
-    openModal($('#modal-generic'), 'Page Resolution — ' + pg.name, body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-generic')) }), save], 'sm');
+    });
+    const setDefBtn = el('button', { text: '★ Set as project default' });
+    setDefBtn.addEventListener('click', () => {
+        const w = clamp(Math.round(+wInp.value || 1), 1, 16384), h = clamp(Math.round(+hInp.value || 1), 1, 16384);
+        state.project.defaultResolution = { width: w, height: h };
+        // Pages that hadn't overridden will now use the new default; current page also auto-inherits
+        pg.resolution = null;
+        closeModal($('#modal-generic')); commit(); fitToScreen();
+        toast('Project default set to ' + w + '×' + h, 'ok');
+    });
+    openModal($('#modal-generic'), 'Page Resolution — ' + pg.name, body,
+        [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-generic')) }), setDefBtn, applyBtn], 'sm');
 }
 
 /* "en" adını İngilizce olarak döndürür: "en" → "English", "tr" → "Turkish" */
@@ -4041,6 +4171,7 @@ async function renderPageToBlob(page, lang, fmt, quality, scale = 1) {
     const res = pageResolution(page);
     const c = document.createElement('canvas'); c.width = Math.round(res.width * scale); c.height = Math.round(res.height * scale);
     const ctx = c.getContext('2d');
+    ctx.imageSmoothingEnabled = false;
     if (scale !== 1) ctx.scale(scale, scale);
     const bgFallback = (fmt.mime === 'image/jpeg' && !page.bgOn) ? '#ffffff' : null;
     renderPageToCtx(ctx, page, lang, { bgFallback });
@@ -4256,6 +4387,20 @@ function migrateProject(p) {
                 delete o.color;
             }
             if (o.type === 'image') applyImageDefaults(o);
+        }
+        // Migrate innerAssetId → group (new format has no innerAssetId)
+        for (let i = 0; i < pg.objects.length; i++) {
+            const o = pg.objects[i];
+            if (o.type === 'image' && o.innerAssetId) {
+                const grp = newGroupObject((o.name || 'Image') + ' Group');
+                const inner = newImageObject(o.x, o.y, o.innerAssetId, o.width, o.height);
+                inner.name = (o.name || 'Image') + ' Inner';
+                applyImageDefaults(inner);
+                grp.childIds = [o.id, inner.id];
+                o.innerAssetId = null;
+                pg.objects.splice(i + 1, 0, inner, grp);
+                i += 2;
+            }
         }
     }
     return p;
