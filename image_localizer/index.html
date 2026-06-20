@@ -1720,7 +1720,7 @@ function renderPageToCtx(ctx, page, lang, opts = {}) {
     else if (opts.bgFallback) { ctx.fillStyle = opts.bgFallback; ctx.fillRect(0, 0, res.width, res.height); }
     for (const obj of page.objects) {
         if (!obj.visible || obj.type === 'group') continue;
-        const grp = page.objects.find(g => g.type === 'group' && g.groupMove && g.childIds && g.childIds.includes(obj.id));
+        const grp = page.objects.find(g => g.type === 'group' && g.childIds && g.childIds.includes(obj.id));
         const useGT = grp && hasActiveGT(grp);
         if (useGT) {
             const pivot = computeGroupPivot(page, grp);
@@ -1819,13 +1819,13 @@ function renderSelectionOverlay() {
         const rawObj = sel[0];
 
         // ---- Group handles ----
-        if (rawObj.type === 'group' && rawObj.groupMove) {
+        if (rawObj.type === 'group') {
             const vo = virtualGroupObject(curPage(), rawObj);
             if (vo) {
                 const cx = vo.x + vo.width / 2, cy = vo.y + vo.height / 2;
                 const ang = (vo.rotation || 0) * D2R;
-                // 4 corner handles (nw/ne/se/sw) → scale group GT
-                for (const [name, fx, fy] of [['nw',0,0],['ne',1,0],['se',1,1],['sw',0,1]]) {
+                // All 8 handles (corners + edges) → scale group GT
+                for (const [name, fx, fy] of HANDLE_DEFS) {
                     const lp = rotatePt(vo.x + vo.width * fx, vo.y + vo.height * fy, cx, cy, ang);
                     const s = canvasToScreen(lp.x, lp.y);
                     const h = el('div', { class: 'handle ' + name, 'data-handle': name });
@@ -2339,7 +2339,23 @@ function doGroupResize(p) {
     if (drag.movesW) Lu = Math.min(Ru - MIN, du);
     if (drag.movesS) Bv = Math.max(Tv + MIN, dv);
     if (drag.movesN) Tv = Math.min(Bv - MIN, dv);
-    const newW = Ru - Lu, newH = Bv - Tv;
+    let newW = Ru - Lu, newH = Bv - Tv;
+    // Aspect ratio lock
+    if (g.arLocked && g.arLockedRatio) {
+        const r = g.arLockedRatio;
+        const movesX = drag.movesE || drag.movesW;
+        const movesY = drag.movesN || drag.movesS;
+        if (movesX && movesY) {
+            newH = Math.max(MIN, newW / r);
+            if (drag.movesS) Bv = Tv + newH; else Tv = Bv - newH;
+        } else if (movesX) {
+            newH = Math.max(MIN, newW / r);
+            Tv = -newH / 2; Bv = newH / 2;
+        } else if (movesY) {
+            newW = Math.max(MIN, newH * r);
+            Lu = -newW / 2; Ru = newW / 2;
+        }
+    }
     g.gt.sx = round(Math.max(0.01, newW / Math.max(1, bboxW)), 4);
     g.gt.sy = round(Math.max(0.01, newH / Math.max(1, bboxH)), 4);
     // Recompute where the new center is (in world space) to update gt.x/y
@@ -2645,7 +2661,7 @@ function _makeGroupRow(g, objs) {
     const ico = el('span', { class: 'ico', text: '📁' });
     const nm = el('span', { class: 'nm', text: g.name });
     nm.addEventListener('dblclick', (e) => { e.stopPropagation(); beginRename(nm, g); });
-    const gmBtn = el('span', { class: 'gm-btn' + (g.groupMove ? ' active' : ''), text: '🔗', title: g.groupMove ? 'Group move ON — click to move layers independently' : 'Group move OFF — click to move layers together' });
+    const gmBtn = el('span', { class: 'gm-btn' + (g.groupMove ? ' active' : ''), text: '🔗', title: g.groupMove ? 'Drag moves group together — click to move children independently' : 'Children move independently — click to move group together' });
     gmBtn.addEventListener('click', (e) => { e.stopPropagation(); g.groupMove = !g.groupMove; commit(); });
     const vis = el('span', { class: 'vis', text: g.visible ? '👁' : '⌀', title: 'Show/Hide group' });
     vis.addEventListener('click', (e) => { e.stopPropagation(); toggleGroupVis(g); });
@@ -2767,7 +2783,7 @@ function inverseGTtoPoint(g, pivot, wx, wy) {
 }
 function getObjGroup(objId, page) {
     const objs = (page || curPage()).objects;
-    return objs.find(o => o.type === 'group' && o.groupMove && o.childIds && o.childIds.includes(objId)) || null;
+    return objs.find(o => o.type === 'group' && o.childIds && o.childIds.includes(objId)) || null;
 }
 function bakeGTintoChild(child, g, pivot) {
     if (!g.gt) return;
@@ -2903,24 +2919,75 @@ function renderGroupInspector(host, g) {
     const children = (g.childIds || []).map(id => objs.find(o => o.id === id)).filter(Boolean);
     if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
     const gt = g.gt;
-    const transformRows = g.groupMove ? [
+
+    // AR lock for scale
+    const vo = virtualGroupObject(curPage(), g);
+    const bboxW = vo ? vo._bboxW : 1;
+    const bboxH = vo ? vo._bboxH : 1;
+    let grpArLocked = g.arLocked || false;
+    let grpArRatio = g.arLockedRatio || (vo ? vo.width / vo.height : 1);
+
+    const sxInp = el('input', { type: 'number', step: '0.01', min: '0.01', value: fmtNum(gt.sx || 1) });
+    const syInp = el('input', { type: 'number', step: '0.01', min: '0.01', value: fmtNum(gt.sy || 1) });
+
+    const arLockBtn = el('button', {
+        class: 'ar-lock-btn' + (grpArLocked ? ' on' : ''),
+        title: grpArLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio', type: 'button'
+    }, grpArLocked ? '🔒 AR' : '🔓 AR');
+    arLockBtn.addEventListener('click', () => {
+        grpArLocked = !grpArLocked;
+        if (grpArLocked) {
+            const cv = virtualGroupObject(curPage(), g);
+            grpArRatio = cv ? cv.width / cv.height : (gt.sx || 1) / (gt.sy || 1);
+        }
+        g.arLocked = grpArLocked; g.arLockedRatio = grpArRatio;
+        arLockBtn.classList.toggle('on', grpArLocked);
+        arLockBtn.textContent = grpArLocked ? '🔒 AR' : '🔓 AR';
+        arLockBtn.title = grpArLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio';
+        commit();
+    });
+
+    sxInp.addEventListener('input', () => {
+        let v = parseFloat(sxInp.value); if (isNaN(v)) return;
+        v = Math.max(0.01, v); gt.sx = v;
+        if (grpArLocked && grpArRatio && bboxW && bboxH) {
+            gt.sy = Math.max(0.01, round((bboxW * v) / (bboxH * grpArRatio), 4));
+            syInp.value = fmtNum(gt.sy);
+        }
+        liveUpdate();
+    });
+    sxInp.addEventListener('change', () => commit());
+    syInp.addEventListener('input', () => {
+        let v = parseFloat(syInp.value); if (isNaN(v)) return;
+        v = Math.max(0.01, v); gt.sy = v;
+        if (grpArLocked && grpArRatio && bboxW && bboxH) {
+            gt.sx = Math.max(0.01, round((v * bboxH * grpArRatio) / bboxW, 4));
+            sxInp.value = fmtNum(gt.sx);
+        }
+        liveUpdate();
+    });
+    syInp.addEventListener('change', () => commit());
+
+    const scaleRow = el('div', { class: 'wh-row' },
+        el('div', { class: 'field' }, el('label', { text: 'Scale X' }), sxInp),
+        arLockBtn,
+        el('div', { class: 'field' }, el('label', { text: 'Scale Y' }), syInp)
+    );
+
+    host.append(
+        group('Group', 'grp-main', [
+            row('Name', bindText(g, 'name')),
+            bindCheck(g, 'groupMove', 'Drag moves children together (🔗)'),
+            el('div', { class: 'mini', style: 'margin-top:6px', text: children.length + ' layer(s) in this group' })
+        ]),
         group('Transform', 'grp-gt', [
             el('div', { class: 'mini', text: 'Applied on top of all children. Pivot = bounding box center.' }),
             row('X', bindNum(gt, 'x', { step: 1 })),
             row('Y', bindNum(gt, 'y', { step: 1 })),
             row('Rotation°', bindNum(gt, 'rot', { step: 1 })),
-            row('Scale X', bindNum(gt, 'sx', { step: 0.01, min: 0.01 })),
-            row('Scale Y', bindNum(gt, 'sy', { step: 0.01, min: 0.01 })),
+            scaleRow,
             el('button', { text: 'Reset transform', onclick: () => { Object.assign(g.gt, {x:0,y:0,rot:0,sx:1,sy:1}); commit(); } })
-        ])
-    ] : [];
-    host.append(
-        group('Group', 'grp-main', [
-            row('Name', bindText(g, 'name')),
-            bindCheck(g, 'groupMove', 'Move + transform children together (🔗)'),
-            el('div', { class: 'mini', style: 'margin-top:6px', text: children.length + ' layer(s) in this group' })
         ]),
-        ...transformRows,
         group('Actions', 'grp-actions', [
             el('button', { text: 'Ungroup (bake & keep layers)', onclick: () => ungroupGroup(g.id) }),
             el('button', { class: 'danger', style: 'margin-top:6px', text: 'Delete group + all layers', onclick: () => deleteGroup(g.id) })
