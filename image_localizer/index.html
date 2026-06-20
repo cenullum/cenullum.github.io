@@ -2068,39 +2068,39 @@ function setupCanvasInteraction() {
         const p = screenToCanvas(e.clientX, e.clientY);
         const hit = hitTest(p.x, p.y);
         if (hit) {
-            // If a single group is already selected and the hit is one of its children,
-            // keep the group selected and start a group-move drag on its GT offset.
-            const selGroup = (!e.shiftKey && state.selection.length === 1) ? getObj(state.selection[0]) : null;
-            if (selGroup && selGroup.type === 'group' && selGroup.groupMove && !selGroup.locked
-                && selGroup.childIds && selGroup.childIds.includes(hit.id)) {
-                if (!selGroup.gt) selGroup.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
-                drag = { mode: 'group-move', moved: false, sx: p.x, sy: p.y, g: selGroup,
-                         startGx: selGroup.gt.x || 0, startGy: selGroup.gt.y || 0 };
-                // No refreshSelectionUI — keep group selected
-            } else {
-            if (e.shiftKey) {
-                const i = state.selection.indexOf(hit.id);
-                if (i >= 0) state.selection.splice(i, 1); else state.selection.push(hit.id);
-            } else if (!state.selection.includes(hit.id)) {
-                state.selection = [hit.id];
+            // When groupMove=ON: clicking any child selects & drags the whole group.
+            // When groupMove=OFF: child is selected/moved individually (regular path).
+            let effectiveHit = hit;
+            if (!e.shiftKey) {
+                const parentGrp = findGroupOf(hit.id);
+                if (parentGrp && parentGrp.groupMove && !parentGrp.locked) effectiveHit = parentGrp;
             }
-            refreshSelectionUI();
-            const movable = selectedObjects().filter(o => !o.locked && o.type !== 'group');
-            const moveIds = new Set(movable.map(o => o.id));
-            for (const mo of movable) {
-                const grp = findGroupOf(mo.id);
-                if (grp && grp.groupMove) {
-                    for (const cid of (grp.childIds || [])) {
-                        if (!moveIds.has(cid)) { const sib = getObj(cid); if (sib && !sib.locked) { moveIds.add(cid); } }
-                    }
+
+            if (effectiveHit.type === 'group' && effectiveHit.groupMove && !effectiveHit.locked) {
+                // Select the group (if not already the sole selection)
+                if (state.selection.length !== 1 || state.selection[0] !== effectiveHit.id) {
+                    state.selection = [effectiveHit.id];
+                    refreshSelectionUI();
                 }
+                if (!effectiveHit.gt) effectiveHit.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+                drag = { mode: 'group-move', moved: false, sx: p.x, sy: p.y, g: effectiveHit,
+                         startGx: effectiveHit.gt.x || 0, startGy: effectiveHit.gt.y || 0 };
+            } else {
+                if (e.shiftKey) {
+                    const i = state.selection.indexOf(effectiveHit.id);
+                    if (i >= 0) state.selection.splice(i, 1); else state.selection.push(effectiveHit.id);
+                } else if (!state.selection.includes(effectiveHit.id)) {
+                    state.selection = [effectiveHit.id];
+                }
+                refreshSelectionUI();
+                const movable = selectedObjects().filter(o => !o.locked && o.type !== 'group');
+                const moveIds = new Set(movable.map(o => o.id));
+                const allMovable = Array.from(moveIds).map(id => getObj(id)).filter(Boolean);
+                drag = {
+                    mode: 'move', moved: false, sx: p.x, sy: p.y,
+                    items: allMovable.map(o => ({ id: o.id, x: o.x, y: o.y }))
+                };
             }
-            const allMovable = Array.from(moveIds).map(id => getObj(id)).filter(Boolean);
-            drag = {
-                mode: 'move', moved: false, sx: p.x, sy: p.y,
-                items: allMovable.map(o => ({ id: o.id, x: o.x, y: o.y }))
-            };
-            } // end else (not group-move)
         } else {
             if (!e.shiftKey) { state.selection = []; refreshSelectionUI(); }
             drag = { mode: 'marquee', sx: p.x, sy: p.y, base: e.shiftKey ? state.selection.slice() : [] };
