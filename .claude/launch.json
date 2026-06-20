@@ -6,6 +6,12 @@
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8099", "--directory", "image_localizer"],
       "port": 8099
+    },
+    {
+      "name": "root",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8098", "--directory", "."],
+      "port": 8098
     }
   ]
 }

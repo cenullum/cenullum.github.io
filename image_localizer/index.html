@@ -1817,6 +1817,43 @@ function renderSelectionOverlay() {
     // handles only for a single, unlocked selection
     if (sel.length === 1 && !sel[0].locked) {
         const rawObj = sel[0];
+
+        // ---- Group handles ----
+        if (rawObj.type === 'group' && rawObj.groupMove) {
+            const vo = virtualGroupObject(curPage(), rawObj);
+            if (vo) {
+                const cx = vo.x + vo.width / 2, cy = vo.y + vo.height / 2;
+                const ang = (vo.rotation || 0) * D2R;
+                // 4 corner handles (nw/ne/se/sw) → scale group GT
+                for (const [name, fx, fy] of [['nw',0,0],['ne',1,0],['se',1,1],['sw',0,1]]) {
+                    const lp = rotatePt(vo.x + vo.width * fx, vo.y + vo.height * fy, cx, cy, ang);
+                    const s = canvasToScreen(lp.x, lp.y);
+                    const h = el('div', { class: 'handle ' + name, 'data-handle': name });
+                    h.style.left = (s.x - 5) + 'px'; h.style.top = (s.y - 5) + 'px';
+                    h.addEventListener('pointerdown', (e) => startGroupResize(e, name, rawObj, vo));
+                    ov.append(h);
+                }
+                // Rotation handle above top-center
+                const nLocal = rotatePt(cx, vo.y, cx, cy, ang);
+                const nScr = canvasToScreen(nLocal.x, nLocal.y);
+                const rLocal = rotatePt(cx, vo.y - 26 / state.zoom, cx, cy, ang);
+                const rScr = canvasToScreen(rLocal.x, rLocal.y);
+                const line = el('div', { class: 'rot-line' });
+                const len = Math.hypot(rScr.x - nScr.x, rScr.y - nScr.y);
+                line.style.left = nScr.x + 'px'; line.style.top = nScr.y + 'px';
+                line.style.height = len + 'px';
+                line.style.transformOrigin = '0 0';
+                line.style.transform = `rotate(${Math.atan2(rScr.y - nScr.y, rScr.x - nScr.x) - Math.PI / 2}rad)`;
+                ov.append(line);
+                const rh = el('div', { class: 'handle rot', 'data-handle': 'rotate', title: 'Rotate group' });
+                rh.style.left = (rScr.x - 5) + 'px'; rh.style.top = (rScr.y - 5) + 'px';
+                rh.addEventListener('pointerdown', (e) => startGroupRotate(e, rawObj, vo));
+                ov.append(rh);
+            }
+            return; // no further regular handles
+        }
+
+        // ---- Regular object handles ----
         const grp0 = getObjGroup(rawObj.id);
         const obj = (grp0 && hasActiveGT(grp0)) ? virtualObjWithGT(rawObj, grp0, computeGroupPivot(curPage(), grp0)) : rawObj;
         const cx = obj.x + obj.width / 2, cy = obj.y + obj.height / 2;
@@ -1885,8 +1922,15 @@ function renderSelectionOverlay() {
 }
 
 function makeBox(obj, cls) {
-    const grp = getObjGroup(obj.id);
-    const vo = (grp && hasActiveGT(grp)) ? virtualObjWithGT(obj, grp, computeGroupPivot(curPage(), grp)) : obj;
+    let vo;
+    if (obj.type === 'group') {
+        const gvo = virtualGroupObject(curPage(), obj);
+        if (!gvo) return el('div'); // empty group → invisible box
+        vo = gvo;
+    } else {
+        const grp = getObjGroup(obj.id);
+        vo = (grp && hasActiveGT(grp)) ? virtualObjWithGT(obj, grp, computeGroupPivot(curPage(), grp)) : obj;
+    }
     const s = canvasToScreen(vo.x, vo.y);
     const b = el('div', { class: cls });
     b.style.left = s.x + 'px'; b.style.top = s.y + 'px';
@@ -2024,6 +2068,16 @@ function setupCanvasInteraction() {
         const p = screenToCanvas(e.clientX, e.clientY);
         const hit = hitTest(p.x, p.y);
         if (hit) {
+            // If a single group is already selected and the hit is one of its children,
+            // keep the group selected and start a group-move drag on its GT offset.
+            const selGroup = (!e.shiftKey && state.selection.length === 1) ? getObj(state.selection[0]) : null;
+            if (selGroup && selGroup.type === 'group' && selGroup.groupMove && !selGroup.locked
+                && selGroup.childIds && selGroup.childIds.includes(hit.id)) {
+                if (!selGroup.gt) selGroup.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+                drag = { mode: 'group-move', moved: false, sx: p.x, sy: p.y, g: selGroup,
+                         startGx: selGroup.gt.x || 0, startGy: selGroup.gt.y || 0 };
+                // No refreshSelectionUI — keep group selected
+            } else {
             if (e.shiftKey) {
                 const i = state.selection.indexOf(hit.id);
                 if (i >= 0) state.selection.splice(i, 1); else state.selection.push(hit.id);
@@ -2046,6 +2100,7 @@ function setupCanvasInteraction() {
                 mode: 'move', moved: false, sx: p.x, sy: p.y,
                 items: allMovable.map(o => ({ id: o.id, x: o.x, y: o.y }))
             };
+            } // end else (not group-move)
         } else {
             if (!e.shiftKey) { state.selection = []; refreshSelectionUI(); }
             drag = { mode: 'marquee', sx: p.x, sy: p.y, base: e.shiftKey ? state.selection.slice() : [] };
@@ -2089,6 +2144,12 @@ function setupCanvasInteraction() {
             doScrew(p);
         } else if (drag.mode === 'rotate') {
             doRotate(p, e.shiftKey);
+        } else if (drag.mode === 'group-resize') {
+            doGroupResize(p);
+        } else if (drag.mode === 'group-rotate') {
+            doGroupRotate(p, e.shiftKey);
+        } else if (drag.mode === 'group-move') {
+            doGroupMove(p);
         } else if (drag.mode === 'marquee') {
             drag.cur = p; drawMarquee();
         }
@@ -2101,7 +2162,9 @@ function setupCanvasInteraction() {
             finalizeMarquee();
             $('#overlay').querySelectorAll('.marquee').forEach(n => n.remove());
         }
-        const changed = (drag.mode === 'move' && drag.moved) || drag.mode === 'resize' || drag.mode === 'rotate';
+        const changed = (drag.mode === 'move' && drag.moved) || drag.mode === 'resize' || drag.mode === 'rotate'
+                     || (drag.mode === 'group-resize' && drag.moved) || (drag.mode === 'group-rotate' && drag.moved)
+                     || (drag.mode === 'group-move' && drag.moved);
         drag = null;
         if (changed) commit(); else refreshSelectionUI();
     });
@@ -2242,6 +2305,78 @@ function doRotate(p, snap15) {
     o.rotation = round((deg % 360 + 360) % 360, 1);
     drag.moved = true;
     requestCanvas(); renderInspectorLight(); updateStatus();
+}
+
+/* ---- Group transform drag (resize / rotate / move via GT) ---- */
+function startGroupResize(e, handle, g, vo) {
+    e.stopPropagation(); e.preventDefault();
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const ang = (vo.rotation || 0) * D2R;
+    const vcx = vo.x + vo.width / 2, vcy = vo.y + vo.height / 2;
+    drag = {
+        mode: 'group-resize', g, handle,
+        vcx, vcy, ang,
+        ux: { x: Math.cos(ang), y: Math.sin(ang) },
+        uy: { x: -Math.sin(ang), y: Math.cos(ang) },
+        bboxW: vo._bboxW, bboxH: vo._bboxH, pivot: vo._pivot,
+        w0: vo.width, h0: vo.height,
+        movesE: handle.includes('e'), movesW: handle.includes('w'),
+        movesN: handle.includes('n'), movesS: handle.includes('s'),
+        moved: false
+    };
+    $('#canvas-wrap').setPointerCapture(e.pointerId);
+}
+function doGroupResize(p) {
+    const g = drag.g;
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const { ux, uy, vcx, vcy, w0, h0, bboxW, bboxH, pivot } = drag;
+    const d = { x: p.x - vcx, y: p.y - vcy };
+    const du = d.x * ux.x + d.y * ux.y;
+    const dv = d.x * uy.x + d.y * uy.y;
+    const MIN = 8;
+    let Lu = -w0/2, Ru = w0/2, Tv = -h0/2, Bv = h0/2;
+    if (drag.movesE) Ru = Math.max(Lu + MIN, du);
+    if (drag.movesW) Lu = Math.min(Ru - MIN, du);
+    if (drag.movesS) Bv = Math.max(Tv + MIN, dv);
+    if (drag.movesN) Tv = Math.min(Bv - MIN, dv);
+    const newW = Ru - Lu, newH = Bv - Tv;
+    g.gt.sx = round(Math.max(0.01, newW / Math.max(1, bboxW)), 4);
+    g.gt.sy = round(Math.max(0.01, newH / Math.max(1, bboxH)), 4);
+    // Recompute where the new center is (in world space) to update gt.x/y
+    const cu = (Lu + Ru) / 2, cv = (Tv + Bv) / 2;
+    const nc = { x: vcx + ux.x * cu + uy.x * cv, y: vcy + ux.y * cu + uy.y * cv };
+    g.gt.x = round(nc.x - pivot.x, 1);
+    g.gt.y = round(nc.y - pivot.y, 1);
+    drag.moved = true;
+    requestCanvas(); updateStatus();
+}
+function startGroupRotate(e, g, vo) {
+    e.stopPropagation(); e.preventDefault();
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const vcx = vo.x + vo.width / 2, vcy = vo.y + vo.height / 2;
+    const p = screenToCanvas(e.clientX, e.clientY);
+    drag = { mode: 'group-rotate', g, c: { x: vcx, y: vcy },
+             startMouse: Math.atan2(p.y - vcy, p.x - vcx), startRot: g.gt.rot || 0, moved: false };
+    $('#canvas-wrap').setPointerCapture(e.pointerId);
+}
+function doGroupRotate(p, snap15) {
+    const g = drag.g;
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const ang = Math.atan2(p.y - drag.c.y, p.x - drag.c.x);
+    let deg = drag.startRot + (ang - drag.startMouse) / D2R;
+    if (snap15) deg = Math.round(deg / 15) * 15;
+    g.gt.rot = round((deg % 360 + 360) % 360, 1);
+    drag.moved = true;
+    requestCanvas(); updateStatus();
+}
+function doGroupMove(p) {
+    const g = drag.g;
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const dx = p.x - drag.sx, dy = p.y - drag.sy;
+    if (Math.abs(dx) + Math.abs(dy) > 0.5) drag.moved = true;
+    g.gt.x = round(drag.startGx + dx, 1);
+    g.gt.y = round(drag.startGy + dy, 1);
+    requestCanvas(); updateStatus();
 }
 
 /* ---------------------- Object ops & Hierarchy -------------------------- */
@@ -2649,6 +2784,23 @@ function virtualObjWithGT(obj, g, pivot) {
     const vc = applyGTtoPoint(g, pivot, obj.x + (obj.width||0)/2, obj.y + (obj.height||0)/2);
     const vw = (obj.width||0)*sx, vh = (obj.height||0)*sy;
     return { ...obj, x: vc.x - vw/2, y: vc.y - vh/2, width: vw, height: vh, rotation: ((obj.rotation||0)+gr) };
+}
+/* Returns a virtual object describing the group's visual bounding box after GT.
+ * Adds _bboxW, _bboxH, _pivot for inverse mapping. Returns null for empty groups. */
+function virtualGroupObject(page, g) {
+    const cs = (g.childIds || []).map(id => page.objects.find(o => o.id === id)).filter(Boolean);
+    if (!cs.length) return null;
+    if (!g.gt) g.gt = { x:0, y:0, rot:0, sx:1, sy:1 };
+    const xs = cs.flatMap(c => [c.x||0, (c.x||0)+(c.width||0)]);
+    const ys = cs.flatMap(c => [c.y||0, (c.y||0)+(c.height||0)]);
+    const bboxW = Math.max(...xs) - Math.min(...xs);
+    const bboxH = Math.max(...ys) - Math.min(...ys);
+    const pivot = { x: (Math.min(...xs)+Math.max(...xs))/2, y: (Math.min(...ys)+Math.max(...ys))/2 };
+    const { x: gx=0, y: gy=0, rot: gr=0, sx=1, sy=1 } = g.gt;
+    const vw = Math.max(8, bboxW * sx), vh = Math.max(8, bboxH * sy);
+    const vcx = pivot.x + gx, vcy = pivot.y + gy;
+    return { x: vcx - vw/2, y: vcy - vh/2, width: vw, height: vh, rotation: gr,
+             _bboxW: bboxW, _bboxH: bboxH, _pivot: pivot };
 }
 
 /* ----------------------------- Inspector -------------------------------- */

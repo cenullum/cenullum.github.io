@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tools — Cenker Cennet</title>
+    <meta name="description" content="Browser-based tools by Cenker Cennet for game development and more.">
+    <link rel="canonical" href="https://cenullum.com/tools/">
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛠</text></svg>">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #6b7280;
+            --secondary-color: #4b5563;
+            --accent-color: #9ca3af;
+            --dark-bg: #050505;
+            --light-bg: #19191b;
+            --text-light: #fff;
+            --text-dark: #333;
+            --shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            --gradient: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+        }
+
+        body {
+            font-family: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
+            line-height: 1.6;
+            color: var(--text-light);
+            background: var(--dark-bg);
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+        }
+
+        /* Top bar */
+        .topbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 20px;
+            background: var(--dark-bg);
+            border-bottom: 1px solid var(--primary-color);
+        }
+
+        .topbar-left {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .home-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+            background: var(--light-bg);
+            border: 1px solid var(--primary-color);
+            border-radius: 3px;
+            color: var(--text-light);
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .home-btn:hover {
+            background: var(--primary-color);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        .home-btn svg {
+            width: 16px;
+            height: 16px;
+            flex-shrink: 0;
+        }
+
+        .page-title {
+            font-size: 1.1rem;
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+
+        /* Lang switcher */
+        .lang-switcher {
+            display: flex;
+            gap: 8px;
+        }
+
+        .lang-btn {
+            padding: 8px 12px;
+            background: var(--light-bg);
+            border: 1px solid var(--primary-color);
+            border-radius: 3px;
+            color: var(--text-light);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-family: Verdana, Geneva, 'DejaVu Sans', Arial, sans-serif;
+            font-size: 0.9rem;
+        }
+
+        .lang-btn:hover,
+        .lang-btn.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+            transform: translateY(-1px);
+            box-shadow: var(--shadow);
+        }
+
+        /* Main content */
+        .content {
+            max-width: 680px;
+            margin: 0 auto;
+            padding: 100px 20px 60px;
+        }
+
+        .section-heading {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            color: var(--text-light);
+        }
+
+        .section-sub {
+            color: var(--accent-color);
+            margin-bottom: 40px;
+            font-size: 0.95rem;
+        }
+
+        /* Tool cards */
+        .tools-list {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .tool-card {
+            display: block;
+            background: var(--light-bg);
+            border: 1px solid var(--primary-color);
+            border-radius: 3px;
+            padding: 24px;
+            text-decoration: none;
+            color: var(--text-light);
+            transition: all 0.3s ease;
+            box-shadow: var(--shadow);
+        }
+
+        .tool-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+            border-color: var(--accent-color);
+        }
+
+        .tool-card-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .tool-card-desc {
+            font-size: 0.9rem;
+            color: var(--accent-color);
+            line-height: 1.5;
+        }
+
+        /* Lang visibility */
+        .lang-content {
+            display: none;
+        }
+
+        .lang-content.active {
+            display: block;
+        }
+
+        .lang-content-inline {
+            display: none;
+        }
+
+        .lang-content-inline.active {
+            display: inline;
+        }
+
+        @media (max-width: 768px) {
+            .topbar {
+                padding: 10px 12px;
+            }
+
+            .page-title {
+                display: none;
+            }
+
+            .content {
+                padding: 80px 16px 40px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="topbar">
+        <div class="topbar-left">
+            <a href="https://cenullum.com/" class="home-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                </svg>
+                <span class="lang-content-inline" data-lang="tr">Ana Sayfa</span>
+                <span class="lang-content-inline active" data-lang="en">Home</span>
+            </a>
+            <span class="page-title">
+                <span class="lang-content-inline" data-lang="tr">Araçlar</span>
+                <span class="lang-content-inline active" data-lang="en">Tools</span>
+            </span>
+        </div>
+        <div class="lang-switcher">
+            <button class="lang-btn" data-lang="tr">TR</button>
+            <button class="lang-btn active" data-lang="en">EN</button>
+        </div>
+    </div>
+
+    <div class="content">
+        <div class="lang-content" data-lang="tr">
+            <h1 class="section-heading">Araçlar</h1>
+            <p class="section-sub">Oyun geliştirme için tarayıcı tabanlı ücretsiz araçlar.</p>
+        </div>
+        <div class="lang-content active" data-lang="en">
+            <h1 class="section-heading">Tools</h1>
+            <p class="section-sub">Free browser-based tools for game development.</p>
+        </div>
+
+        <div class="tools-list">
+
+            <a href="https://cenullum.com/image_localizer" class="tool-card">
+                <div class="tool-card-title">Image Localizer</div>
+                <div class="tool-card-desc">
+                    <span class="lang-content-inline" data-lang="tr">Oyun görselleri için çok dilli metin ve katman editörü. Metin, görsel ve dikdörtgen katmanlarını destekler, tüm dilleri tek seferde ZIP olarak dışa aktarır. Harici kütüphane gerektirmez, tamamen tarayıcıda çalışır.</span>
+                    <span class="lang-content-inline active" data-lang="en">Multi-language image composer for game UI. Supports text, image and rect layers, exports all languages at once as a ZIP. No external libraries — runs entirely in the browser.</span>
+                </div>
+            </a>
+
+            <a href="https://cenullum.com/scoreapp" class="tool-card">
+                <div class="tool-card-title">Score App</div>
+                <div class="tool-card-desc">
+                    <span class="lang-content-inline" data-lang="tr">Herhangi bir listeyi puanlamanıza yardımcı olan uygulama. Listelerinizi şifreli dosyalar olarak bilgisayarınıza kaydederek gizli tutun.</span>
+                    <span class="lang-content-inline active" data-lang="en">An app that helps you score any list. Keep your lists private by saving them as password-protected files on your computer.</span>
+                </div>
+            </a>
+
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const saved = localStorage.getItem('selectedLanguage') || 'en';
+            applyLang(saved);
+
+            document.querySelectorAll('.lang-btn').forEach(btn => {
+                btn.addEventListener('click', function () {
+                    const lang = this.getAttribute('data-lang');
+                    applyLang(lang);
+                    localStorage.setItem('selectedLanguage', lang);
+                });
+            });
+
+            function applyLang(lang) {
+                document.querySelectorAll('.lang-btn').forEach(b => {
+                    b.classList.toggle('active', b.getAttribute('data-lang') === lang);
+                });
+                document.querySelectorAll('.lang-content').forEach(el => {
+                    el.classList.toggle('active', el.getAttribute('data-lang') === lang);
+                });
+                document.querySelectorAll('.lang-content-inline').forEach(el => {
+                    el.classList.toggle('active', el.getAttribute('data-lang') === lang);
+                });
+                document.documentElement.lang = lang;
+            }
+        })();
+    </script>
+</body>
+
+</html>

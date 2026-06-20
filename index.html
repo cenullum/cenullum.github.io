@@ -540,10 +540,19 @@
                 grid-template-columns: 1fr;
             }
         }
+
     </style>
 </head>
 
 <body>
+    <!-- Tools Button (top-left) -->
+    <div style="position:fixed;top:20px;left:20px;z-index:1000;">
+        <a href="./tools/" class="lang-btn">
+            <span class="lang-content" data-lang="tr">Araçlar</span>
+            <span class="lang-content active" data-lang="en">Tools</span>
+        </a>
+    </div>
+
     <!-- Language Switcher & Donation -->
     <div class="language-switcher">
         <a href="./donation/" class="lang-btn">
