@@ -197,7 +197,7 @@
         /* Cards */
         .cards-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 30px;
             margin-top: 40px;
         }
@@ -561,7 +561,10 @@
 
 <body>
     <!-- Tools Button (top-left) -->
-    <a href="./tools/" class="lang-btn tools-btn">Araçlar</a>
+    <a href="./tools/" class="lang-btn tools-btn">
+        <span class="lang-content" data-lang="tr">Araçlar</span>
+        <span class="lang-content active" data-lang="en">Tools</span>
+    </a>
 
     <!-- Language Switcher & Donation -->
     <div class="language-switcher">
