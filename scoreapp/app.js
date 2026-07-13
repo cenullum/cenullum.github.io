@@ -16,6 +16,7 @@ const views = {
     saveModal: document.getElementById('save-modal'),
     smartCompare: document.getElementById('smart-compare-modal'),
     createList: document.getElementById('create-list-view'),
+    analytics: document.getElementById('analytics-view'),
     fullscreen: document.getElementById('fullscreen-overlay')
 };
 
@@ -66,6 +67,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-save-list').addEventListener('click', () => showView('saveModal'));
     document.getElementById('search-input').addEventListener('input', renderDashboard);
     document.getElementById('btn-smart-compare').addEventListener('click', startSmartCompare);
+    document.getElementById('btn-analytics').addEventListener('click', openAnalytics);
+    document.getElementById('btn-close-analytics').addEventListener('click', () => showView('dashboard'));
+    document.getElementById('analytics-tabs').addEventListener('click', (e) => {
+        const tabBtn = e.target.closest('.analytics-tab');
+        if (!tabBtn) return;
+        analyticsState.tab = tabBtn.dataset.tab;
+        document.querySelectorAll('.analytics-tab').forEach(b => b.classList.toggle('active', b === tabBtn));
+        renderAnalytics();
+    });
 
     // Create List View
     document.getElementById('btn-close-create-list').addEventListener('click', () => showView('welcome'));
@@ -823,6 +833,415 @@ function updateOverallAverage(item) {
     });
     const finalAvg = count > 0 ? (avg / count).toFixed(1) : '0.0';
     document.getElementById('scoring-overall-average').textContent = finalAvg;
+}
+
+// --- Analytics (read-only visualization, never mutates appState) ---
+let analyticsState = {
+    tab: 'ranking',
+    sortKey: 'avg',      // 'avg' or a feature id
+    sortDir: 'desc',
+    manualOrder: null,   // array of item ids after user drag-reorder (visual only)
+    scatterX: null,
+    scatterY: null,
+    scatterOffsets: {}   // itemId -> {dx, dy} visual drag offsets
+};
+
+function openAnalytics() {
+    if (appState.items.length === 0) {
+        alert("Add some items first to see analytics.");
+        return;
+    }
+    // Reset transient visual state each time the modal opens
+    analyticsState.manualOrder = null;
+    analyticsState.scatterOffsets = {};
+    if (!appState.features.some(f => f.id === analyticsState.scatterX)) analyticsState.scatterX = appState.features[0] ? appState.features[0].id : null;
+    if (!appState.features.some(f => f.id === analyticsState.scatterY)) analyticsState.scatterY = appState.features[1] ? appState.features[1].id : analyticsState.scatterX;
+    if (!(analyticsState.sortKey === 'avg' || appState.features.some(f => f.id === analyticsState.sortKey))) analyticsState.sortKey = 'avg';
+    showView('analytics');
+    renderAnalytics();
+}
+
+function getItemAvg(item) {
+    let sum = 0, count = 0;
+    appState.features.forEach(f => {
+        if (item.scores[f.id] !== undefined) { sum += item.scores[f.id]; count++; }
+    });
+    return count > 0 ? sum / count : null;
+}
+
+function getMetricValue(item, key) {
+    if (key === 'avg') return getItemAvg(item);
+    return item.scores[key] !== undefined ? item.scores[key] : null;
+}
+
+function scoreColor(v) {
+    // 0 -> red, 5 -> yellow, 10 -> green
+    const hue = Math.max(0, Math.min(10, v)) * 12; // 0..120
+    return `hsl(${hue}, 65%, 45%)`;
+}
+
+function analyticsThumb(item, size) {
+    return item.imageBase64
+        ? `<img src="${item.imageBase64}" class="rank-thumb" style="width:${size}px;height:${size}px;" alt="">`
+        : `<div class="rank-thumb-placeholder" style="width:${size}px;height:${size}px;"><i class="fas fa-image"></i></div>`;
+}
+
+function renderAnalytics() {
+    const controls = document.getElementById('analytics-controls');
+    const body = document.getElementById('analytics-body');
+    const hint = document.getElementById('analytics-hint');
+    controls.innerHTML = '';
+    body.innerHTML = '';
+    hint.textContent = '';
+
+    switch (analyticsState.tab) {
+        case 'ranking': renderAnalyticsRanking(controls, body, hint); break;
+        case 'breakdown': renderAnalyticsBreakdown(controls, body, hint); break;
+        case 'scatter': renderAnalyticsScatter(controls, body, hint); break;
+        case 'insights': renderAnalyticsInsights(controls, body, hint); break;
+    }
+}
+
+function buildMetricSelect(id, selected, includeAvg) {
+    let opts = includeAvg ? `<option value="avg" ${selected === 'avg' ? 'selected' : ''}>Overall Average</option>` : '';
+    appState.features.forEach(f => {
+        opts += `<option value="${f.id}" ${selected === f.id ? 'selected' : ''}>${f.name}</option>`;
+    });
+    return `<select id="${id}" class="input-field">${opts}</select>`;
+}
+
+// -- Ranking tab: sortable horizontal bars with drag-reorder --
+function renderAnalyticsRanking(controls, body, hint) {
+    controls.innerHTML = `
+        <label>Sort by</label>
+        ${buildMetricSelect('analytics-sort-key', analyticsState.sortKey, true)}
+        <button class="btn btn-outline" id="analytics-sort-dir" style="padding: 8px 14px;">
+            <i class="fas fa-sort-amount-${analyticsState.sortDir === 'desc' ? 'down' : 'up'}"></i>
+            ${analyticsState.sortDir === 'desc' ? 'High → Low' : 'Low → High'}
+        </button>
+    `;
+    controls.querySelector('#analytics-sort-key').addEventListener('change', (e) => {
+        analyticsState.sortKey = e.target.value;
+        analyticsState.manualOrder = null;
+        renderAnalytics();
+    });
+    controls.querySelector('#analytics-sort-dir').addEventListener('click', () => {
+        analyticsState.sortDir = analyticsState.sortDir === 'desc' ? 'asc' : 'desc';
+        analyticsState.manualOrder = null;
+        renderAnalytics();
+    });
+
+    let items = [...appState.items];
+    if (analyticsState.manualOrder) {
+        items.sort((a, b) => analyticsState.manualOrder.indexOf(a.id) - analyticsState.manualOrder.indexOf(b.id));
+    } else {
+        items.sort((a, b) => {
+            const va = getMetricValue(a, analyticsState.sortKey);
+            const vb = getMetricValue(b, analyticsState.sortKey);
+            if (va === null && vb === null) return 0;
+            if (va === null) return 1;
+            if (vb === null) return -1;
+            return analyticsState.sortDir === 'desc' ? vb - va : va - vb;
+        });
+    }
+
+    const list = document.createElement('div');
+    items.forEach((item, idx) => {
+        const val = getMetricValue(item, analyticsState.sortKey);
+        const row = document.createElement('div');
+        row.className = 'rank-row';
+        row.draggable = true;
+        row.dataset.itemId = item.id;
+        row.innerHTML = `
+            <div class="rank-pos">${idx + 1}</div>
+            ${analyticsThumb(item, 44)}
+            <div class="rank-info">
+                <div class="rank-name">${item.name}</div>
+                <div class="rank-bar-track">
+                    <div class="rank-bar-fill" style="width:${val === null ? 0 : val * 10}%; background:${val === null ? 'transparent' : scoreColor(val)};"></div>
+                </div>
+            </div>
+            <div class="rank-score" style="color:${val === null ? 'var(--text-light)' : scoreColor(val)};">${val === null ? '—' : val.toFixed(1)}</div>
+        `;
+        list.appendChild(row);
+    });
+    body.appendChild(list);
+    setupRankDrag(list);
+
+    hint.textContent = 'Drag rows to rearrange them visually. This only changes the display — your saved data is never modified.';
+}
+
+function setupRankDrag(list) {
+    let draggedId = null;
+
+    list.querySelectorAll('.rank-row').forEach(row => {
+        row.addEventListener('dragstart', () => {
+            draggedId = row.dataset.itemId;
+            row.classList.add('dragging');
+        });
+        row.addEventListener('dragend', () => {
+            draggedId = null;
+            row.classList.remove('dragging');
+            list.querySelectorAll('.rank-row').forEach(r => r.classList.remove('drag-over'));
+        });
+        row.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            if (row.dataset.itemId !== draggedId) row.classList.add('drag-over');
+        });
+        row.addEventListener('dragleave', () => row.classList.remove('drag-over'));
+        row.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const targetId = row.dataset.itemId;
+            if (!draggedId || draggedId === targetId) return;
+            const order = Array.from(list.querySelectorAll('.rank-row')).map(r => r.dataset.itemId);
+            const from = order.indexOf(draggedId);
+            const to = order.indexOf(targetId);
+            order.splice(from, 1);
+            order.splice(to, 0, draggedId);
+            analyticsState.manualOrder = order;
+            renderAnalytics();
+        });
+    });
+}
+
+// -- Breakdown tab: per-item feature bars --
+function renderAnalyticsBreakdown(controls, body, hint) {
+    controls.innerHTML = `
+        <label>Sort by</label>
+        ${buildMetricSelect('analytics-sort-key', analyticsState.sortKey, true)}
+    `;
+    controls.querySelector('#analytics-sort-key').addEventListener('change', (e) => {
+        analyticsState.sortKey = e.target.value;
+        renderAnalytics();
+    });
+
+    const items = [...appState.items].sort((a, b) => {
+        const va = getMetricValue(a, analyticsState.sortKey);
+        const vb = getMetricValue(b, analyticsState.sortKey);
+        return (vb === null ? -1 : vb) - (va === null ? -1 : va);
+    });
+
+    items.forEach(item => {
+        const avg = getItemAvg(item);
+        const card = document.createElement('div');
+        card.className = 'breakdown-item';
+
+        let rows = '';
+        appState.features.forEach(f => {
+            const v = item.scores[f.id];
+            rows += `
+                <div class="breakdown-feat-row">
+                    <div class="breakdown-feat-name">${f.name}</div>
+                    <div class="rank-bar-track" style="flex:1;">
+                        <div class="rank-bar-fill" style="width:${v === undefined ? 0 : v * 10}%; background:${v === undefined ? 'transparent' : scoreColor(v)};"></div>
+                    </div>
+                    <div class="breakdown-feat-val">${v === undefined ? '—' : v}</div>
+                </div>
+            `;
+        });
+
+        card.innerHTML = `
+            <div class="breakdown-head">
+                ${analyticsThumb(item, 40)}
+                <div style="flex:1; font-weight:600;">${item.name}</div>
+                <div style="font-weight:bold; color:${avg === null ? 'var(--text-light)' : scoreColor(avg)};">${avg === null ? 'New' : avg.toFixed(1)} <span style="font-size:0.7em; opacity:0.6; font-weight:normal;">avg</span></div>
+            </div>
+            ${rows}
+        `;
+        body.appendChild(card);
+    });
+
+    hint.textContent = 'Every feature score per item, side by side. Colors go from red (low) to green (high).';
+}
+
+// -- Scatter tab: two features as X/Y axes, draggable dots (visual only) --
+function renderAnalyticsScatter(controls, body, hint) {
+    if (!analyticsState.scatterX) {
+        body.innerHTML = '<p style="opacity:0.7;">You need at least one scoring feature for the scatter chart.</p>';
+        return;
+    }
+
+    controls.innerHTML = `
+        <label>X axis</label>
+        ${buildMetricSelect('analytics-scatter-x', analyticsState.scatterX, false)}
+        <label>Y axis</label>
+        ${buildMetricSelect('analytics-scatter-y', analyticsState.scatterY, false)}
+        <button class="btn btn-outline" id="analytics-scatter-reset" style="padding: 8px 14px;"><i class="fas fa-undo"></i> Reset positions</button>
+    `;
+    controls.querySelector('#analytics-scatter-x').addEventListener('change', (e) => {
+        analyticsState.scatterX = e.target.value;
+        analyticsState.scatterOffsets = {};
+        renderAnalytics();
+    });
+    controls.querySelector('#analytics-scatter-y').addEventListener('change', (e) => {
+        analyticsState.scatterY = e.target.value;
+        analyticsState.scatterOffsets = {};
+        renderAnalytics();
+    });
+    controls.querySelector('#analytics-scatter-reset').addEventListener('click', () => {
+        analyticsState.scatterOffsets = {};
+        renderAnalytics();
+    });
+
+    const W = 720, H = 480, PAD = 50;
+    const featX = appState.features.find(f => f.id === analyticsState.scatterX);
+    const featY = appState.features.find(f => f.id === analyticsState.scatterY);
+    const toX = v => PAD + (v / 10) * (W - PAD * 2);
+    const toY = v => H - PAD - (v / 10) * (H - PAD * 2);
+
+    // Grid lines + labels
+    let grid = '';
+    for (let i = 0; i <= 10; i += 2) {
+        grid += `<line x1="${toX(i)}" y1="${PAD}" x2="${toX(i)}" y2="${H - PAD}" stroke="var(--border-color)" stroke-width="0.5" opacity="0.4"/>`;
+        grid += `<line x1="${PAD}" y1="${toY(i)}" x2="${W - PAD}" y2="${toY(i)}" stroke="var(--border-color)" stroke-width="0.5" opacity="0.4"/>`;
+        grid += `<text x="${toX(i)}" y="${H - PAD + 20}" text-anchor="middle" fill="var(--text-light)" opacity="0.6" font-size="11">${i}</text>`;
+        grid += `<text x="${PAD - 12}" y="${toY(i) + 4}" text-anchor="end" fill="var(--text-light)" opacity="0.6" font-size="11">${i}</text>`;
+    }
+
+    let nodes = '';
+    const scoredItems = appState.items.filter(i => i.scores[analyticsState.scatterX] !== undefined && i.scores[analyticsState.scatterY] !== undefined);
+    scoredItems.forEach(item => {
+        const off = analyticsState.scatterOffsets[item.id] || { dx: 0, dy: 0 };
+        const cx = toX(item.scores[analyticsState.scatterX]) + off.dx;
+        const cy = toY(item.scores[analyticsState.scatterY]) + off.dy;
+        const avg = getItemAvg(item);
+        const imgTag = item.imageBase64
+            ? `<image href="${item.imageBase64}" x="-16" y="-16" width="32" height="32" clip-path="circle(16px)" preserveAspectRatio="xMidYMid slice"/>`
+            : `<circle r="14" fill="${scoreColor(avg === null ? 5 : avg)}"/>`;
+        nodes += `
+            <g class="scatter-node" data-item-id="${item.id}" transform="translate(${cx},${cy})">
+                <circle r="18" fill="var(--light-bg)" stroke="${scoreColor(avg === null ? 5 : avg)}" stroke-width="2"/>
+                ${imgTag}
+                <text y="32" text-anchor="middle" fill="var(--text-light)" font-size="11" font-weight="600">${item.name}</text>
+            </g>
+        `;
+    });
+
+    body.innerHTML = `
+        <div class="scatter-wrap">
+            <svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+                ${grid}
+                <line x1="${PAD}" y1="${H - PAD}" x2="${W - PAD}" y2="${H - PAD}" stroke="var(--accent-color)" stroke-width="1.5"/>
+                <line x1="${PAD}" y1="${PAD}" x2="${PAD}" y2="${H - PAD}" stroke="var(--accent-color)" stroke-width="1.5"/>
+                <text x="${W / 2}" y="${H - 8}" text-anchor="middle" fill="var(--text-light)" font-size="13" font-weight="bold">${featX ? featX.name : ''} →</text>
+                <text x="14" y="${H / 2}" text-anchor="middle" fill="var(--text-light)" font-size="13" font-weight="bold" transform="rotate(-90 14 ${H / 2})">${featY ? featY.name : ''} →</text>
+                ${nodes}
+            </svg>
+        </div>
+    `;
+
+    if (scoredItems.length === 0) {
+        body.innerHTML += '<p style="opacity:0.7; text-align:center;">No items have scores for both selected features yet.</p>';
+    }
+
+    setupScatterDrag(body.querySelector('svg'), toX, toY);
+    hint.textContent = 'Drag the dots around to explore. Positions are visual only — scores in your file never change.';
+}
+
+function setupScatterDrag(svg, toX, toY) {
+    if (!svg) return;
+    let dragNode = null, dragId = null, startPt = null, startOff = null;
+
+    const getPoint = (e) => {
+        const pt = svg.createSVGPoint();
+        pt.x = e.clientX;
+        pt.y = e.clientY;
+        return pt.matrixTransform(svg.getScreenCTM().inverse());
+    };
+
+    svg.addEventListener('pointerdown', (e) => {
+        const node = e.target.closest('.scatter-node');
+        if (!node) return;
+        dragNode = node;
+        dragId = node.dataset.itemId;
+        startPt = getPoint(e);
+        startOff = analyticsState.scatterOffsets[dragId] || { dx: 0, dy: 0 };
+        svg.setPointerCapture(e.pointerId);
+    });
+
+    svg.addEventListener('pointermove', (e) => {
+        if (!dragNode) return;
+        const pt = getPoint(e);
+        const off = { dx: startOff.dx + (pt.x - startPt.x), dy: startOff.dy + (pt.y - startPt.y) };
+        analyticsState.scatterOffsets[dragId] = off;
+        const item = appState.items.find(i => i.id === dragId);
+        const cx = toX(item.scores[analyticsState.scatterX]) + off.dx;
+        const cy = toY(item.scores[analyticsState.scatterY]) + off.dy;
+        dragNode.setAttribute('transform', `translate(${cx},${cy})`);
+    });
+
+    const endDrag = () => { dragNode = null; dragId = null; };
+    svg.addEventListener('pointerup', endDrag);
+    svg.addEventListener('pointercancel', endDrag);
+}
+
+// -- Insights tab: automatic textual analysis --
+function renderAnalyticsInsights(controls, body, hint) {
+    const scored = appState.items.filter(i => getItemAvg(i) !== null);
+    if (scored.length === 0) {
+        body.innerHTML = '<p style="opacity:0.7;">Score some items first to see insights.</p>';
+        return;
+    }
+
+    const cards = [];
+    const insightRow = (item, valueText) => `
+        <div class="insight-main">${analyticsThumb(item, 36)} <span>${item.name}</span>
+        <span style="margin-left:auto; color:var(--accent-color);">${valueText}</span></div>`;
+
+    // Champion & lowest
+    const byAvg = [...scored].sort((a, b) => getItemAvg(b) - getItemAvg(a));
+    cards.push(`<div class="insight-card"><h4><i class="fas fa-trophy"></i> Top Rated</h4>${insightRow(byAvg[0], getItemAvg(byAvg[0]).toFixed(1))}<p>Highest overall average in the list.</p></div>`);
+    if (byAvg.length > 1) {
+        const last = byAvg[byAvg.length - 1];
+        cards.push(`<div class="insight-card"><h4><i class="fas fa-arrow-down"></i> Lowest Rated</h4>${insightRow(last, getItemAvg(last).toFixed(1))}<p>Lowest overall average — biggest room to improve.</p></div>`);
+    }
+
+    // Best per feature
+    appState.features.forEach(f => {
+        const withScore = scored.filter(i => i.scores[f.id] !== undefined);
+        if (withScore.length === 0) return;
+        const best = withScore.reduce((a, b) => (b.scores[f.id] > a.scores[f.id] ? b : a));
+        cards.push(`<div class="insight-card"><h4><i class="fas fa-star"></i> Best "${f.name}"</h4>${insightRow(best, best.scores[f.id])}<p>Leads all items in this feature.</p></div>`);
+    });
+
+    // Most consistent / most polarizing (needs 2+ features)
+    if (appState.features.length > 1) {
+        const spread = (item) => {
+            const vals = appState.features.map(f => item.scores[f.id]).filter(v => v !== undefined);
+            if (vals.length < 2) return null;
+            return Math.max(...vals) - Math.min(...vals);
+        };
+        const withSpread = scored.map(i => ({ item: i, s: spread(i) })).filter(x => x.s !== null);
+        if (withSpread.length > 0) {
+            withSpread.sort((a, b) => a.s - b.s);
+            const consistent = withSpread[0];
+            const polarizing = withSpread[withSpread.length - 1];
+            cards.push(`<div class="insight-card"><h4><i class="fas fa-balance-scale"></i> Most Consistent</h4>${insightRow(consistent.item, '±' + (consistent.s / 2).toFixed(1))}<p>Smallest gap between its best and worst feature.</p></div>`);
+            if (polarizing !== consistent && polarizing.s > 0) {
+                cards.push(`<div class="insight-card"><h4><i class="fas fa-bolt"></i> Most Polarizing</h4>${insightRow(polarizing.item, '±' + (polarizing.s / 2).toFixed(1))}<p>Biggest gap between its best and worst feature.</p></div>`);
+            }
+        }
+
+        // Feature averages
+        let featRows = '';
+        appState.features.forEach(f => {
+            const vals = scored.map(i => i.scores[f.id]).filter(v => v !== undefined);
+            if (vals.length === 0) return;
+            const m = vals.reduce((a, b) => a + b, 0) / vals.length;
+            featRows += `
+                <div class="breakdown-feat-row">
+                    <div class="breakdown-feat-name">${f.name}</div>
+                    <div class="rank-bar-track" style="flex:1;">
+                        <div class="rank-bar-fill" style="width:${m * 10}%; background:${scoreColor(m)};"></div>
+                    </div>
+                    <div class="breakdown-feat-val">${m.toFixed(1)}</div>
+                </div>`;
+        });
+        cards.push(`<div class="insight-card" style="grid-column: 1 / -1;"><h4><i class="fas fa-chart-line"></i> Feature Averages</h4>${featRows}<p>How generous your scoring is per feature, across all items.</p></div>`);
+    }
+
+    body.innerHTML = `<div class="insights-grid">${cards.join('')}</div>`;
+    hint.textContent = 'Insights are computed live from your current scores.';
 }
 
 // --- Smart Compare (Pairwise Feature Comparison) ---
