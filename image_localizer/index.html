@@ -393,7 +393,8 @@
                 <button id="btn-legal" title="Legal &amp; license">⚖ Legal</button>
             </div>
             <div class="tb-group">
-                <button id="btn-export" class="primary" title="Export images">⬇ Export</button>
+                <button id="btn-export" class="primary" title="Export images (all pages)">⬇ Export</button>
+                <button id="btn-export-page" title="Export only the currently active canvas">⬇ Export Current Canvas</button>
             </div>
         </div>
 
@@ -795,10 +796,11 @@ function selectedObjects() { return state.selection.map(getObj).filter(Boolean);
 function firstSelected() { return getObj(state.selection[0]); }
 function langList() {
     const set = new Set();
-    for (const f of state.project.localization.files) for (const l of f.languages) set.add(l);
+    for (const f of state.project.localization.files) for (const l of f.languages) set.add(canonLang(l));
     // also expose languages discovered from image filename suffixes (logo_tr.png → tr)
     const groups = assetGroups();
-    for (const g of groups.byBase.values()) for (const l of g.langs) set.add(l);
+    for (const g of groups.byBase.values()) for (const l of g.langs) set.add(canonLang(l));
+    set.delete('');
     return Array.from(set);
 }
 
@@ -898,6 +900,15 @@ function isLangCode(s) {
     if (KNOWN_LANGS.has(k)) return true;
     return /^[a-z]{2,3}(-[a-z0-9]{2,4})?$/i.test(k) && k.length <= 6;
 }
+/* Canonical BCP-47 form, so "zh-cn", "zh_CN" and "zh-CN" are ONE language and not
+   three. Every code entering the project (loc files, filenames, manual adds) is
+   pushed through this so comparisons/dedupe work by plain string equality. */
+function canonLang(code) {
+    const s = String(code == null ? '' : code).trim().replace(/_/g, '-');
+    if (!s) return '';
+    try { const c = Intl.getCanonicalLocales(s); if (c && c.length) return c[0]; } catch (e) {}
+    return s.toLowerCase();
+}
 
 /* --------- Language-variant image assets (name_xx.png grouping) ----------- *
  * If an image's filename ends with "_<langcode>" (e.g. logo_tr.png, logo_en.png)
@@ -921,7 +932,7 @@ function langDisplayName(code) {
 function parseAssetLang(name) {
     const stem = String(name || '').replace(/\.[^.]+$/, '');
     const m = stem.match(/^(.+)_([A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,4})?)$/);
-    if (m && isLangCode(m[2])) return { base: m[1], lang: m[2].toLowerCase() };
+    if (m && isLangCode(m[2])) return { base: m[1], lang: canonLang(m[2]) };
     return { base: stem, lang: null };
 }
 
@@ -952,7 +963,7 @@ function resolveAssetForLang(assetId, lang) {
     if (!assetId || !lang || lang === '__key') return assetId;
     const g = assetGroupOf(assetId);
     if (!g || g.langs.length < 1) return assetId;
-    const l = String(lang).toLowerCase();
+    const l = canonLang(lang);
     if (g.byLang[l]) return g.byLang[l];
     const baseLang = l.split('-')[0];
     if (g.byLang[baseLang]) return g.byLang[baseLang];
@@ -986,7 +997,7 @@ function buildLocFromCSV(text) {
     const rows = parseCSV(text);
     if (rows.length < 2) throw new Error('CSV needs a header row and at least one data row.');
     const header = rows[0].map(h => h.trim());
-    const languages = header.slice(1).filter(Boolean);
+    const languages = header.slice(1).filter(Boolean).map(canonLang);
     const data = {}; const keys = [];
     for (let r = 1; r < rows.length; r++) {
         const cells = rows[r];
@@ -1006,7 +1017,7 @@ function buildLocFromJSON(obj, filenameStem) {
     // Case: flat { key: "value" } single-language file
     const allStringVals = topKeys.every(k => typeof obj[k] === 'string');
     if (allStringVals) {
-        const lang = isLangCode(filenameStem) ? filenameStem.toLowerCase() : 'value';
+        const lang = isLangCode(filenameStem) ? canonLang(filenameStem) : 'value';
         const data = {}; const keys = [];
         for (const k of topKeys) { data[k] = { [lang]: obj[k] }; keys.push(k); }
         return { languages: [lang], keys, data };
@@ -1027,8 +1038,9 @@ function buildLocFromJSON(obj, filenameStem) {
     const useB = (bScore >= 0.6 && bScore >= aScore) || (bScore > aScore && topKeys.length <= 12);
 
     if (useB) { // { lang: { key: value } }
-        for (const lang of topKeys) {
-            const inner = obj[lang]; if (!inner || typeof inner !== 'object') continue;
+        for (const rawLang of topKeys) {
+            const inner = obj[rawLang]; if (!inner || typeof inner !== 'object') continue;
+            const lang = canonLang(rawLang);
             langSet.add(lang);
             for (const key of Object.keys(inner)) {
                 if (!data[key]) { data[key] = {}; keys.push(key); }
@@ -1041,13 +1053,19 @@ function buildLocFromJSON(obj, filenameStem) {
             if (inner == null) continue;
             if (typeof inner !== 'object' || Array.isArray(inner)) continue;
             data[key] = {}; keys.push(key);
-            for (const lang of Object.keys(inner)) { langSet.add(lang); data[key][lang] = stringifyVal(inner[lang]); }
+            for (const rawLang of Object.keys(inner)) {
+                const lang = canonLang(rawLang);
+                langSet.add(lang); data[key][lang] = stringifyVal(inner[rawLang]);
+            }
         }
     }
     return { languages: Array.from(langSet), keys, data };
 }
 function stringifyVal(v) { return v == null ? '' : (typeof v === 'string' ? v : (typeof v === 'object' ? JSON.stringify(v) : String(v))); }
-function slugLang(s) { return String(s).trim().toLowerCase().replace(/[^a-z0-9_-]+/g, '').slice(0, 24) || 'lang'; }
+function slugLang(s) {
+    const cleaned = String(s).trim().replace(/[^A-Za-z0-9_-]+/g, '').slice(0, 24);
+    return canonLang(cleaned) || 'lang';
+}
 
 /* Flat { key: "value" } JSON treated as a single language's strings. */
 function buildLocFromFlatJSON(obj, lang) {
@@ -1177,10 +1195,11 @@ function ensureManualLocFile() {
     }
     return f;
 }
-/* Languages contributed by actual loc files (i.e. removable, not asset-derived). */
+/* Languages contributed by actual loc files (as opposed to image-filename variants). */
 function fileLangs() {
     const set = new Set();
-    for (const f of state.project.localization.files) for (const l of f.languages) set.add(l);
+    for (const f of state.project.localization.files) for (const l of f.languages) set.add(canonLang(l));
+    set.delete('');
     return Array.from(set);
 }
 function addManualLanguage(code) {
@@ -1194,10 +1213,13 @@ function addManualLanguage(code) {
 }
 /* Strip a language from every loc file (languages list + per-key data). */
 function removeLanguageEverywhere(code) {
-    code = String(code).toLowerCase();
+    code = canonLang(code);
     for (const f of state.project.localization.files) {
-        f.languages = f.languages.filter(l => l !== code);
-        for (const k of Object.keys(f.data)) { if (f.data[k] && code in f.data[k]) delete f.data[k][code]; }
+        f.languages = f.languages.filter(l => canonLang(l) !== code);
+        for (const k of Object.keys(f.data)) {
+            const row = f.data[k]; if (!row) continue;
+            for (const l of Object.keys(row)) if (canonLang(l) === code) delete row[l];
+        }
     }
     commit();
 }
@@ -2165,6 +2187,8 @@ function setupCanvasInteraction() {
         const changed = (drag.mode === 'move' && drag.moved) || drag.mode === 'resize' || drag.mode === 'rotate'
                      || (drag.mode === 'group-resize' && drag.moved) || (drag.mode === 'group-rotate' && drag.moved)
                      || (drag.mode === 'group-move' && drag.moved);
+        // Group transforms live only for the duration of the drag — bake them in.
+        if (drag.g && (drag.mode === 'group-move' || drag.mode === 'group-resize' || drag.mode === 'group-rotate')) bakeGroupGT(drag.g);
         drag = null;
         if (changed) commit(); else refreshSelectionUI();
     });
@@ -2425,14 +2449,47 @@ function addImage(assetId) {
     if (!aid) toast('Fill layer added — pick a color/gradient, or assign an asset', '', 2500);
 }
 
-function duplicateSelection() {
-    const sel = selectedObjects().filter(o => o.type !== 'group'); if (!sel.length) return;
-    const objs = curObjects(); const clones = [];
-    for (const o of sel) {
-        const c = deepClone(o); c.id = uid('obj'); c.x += 24; c.y += 24; c.name = o.name + ' copy';
-        objs.push(c); clones.push(c.id);
+/* Expand a list of objects so that every selected group also brings its children.
+   Returned in array (z) order, without duplicates. */
+function withGroupChildren(list, objs) {
+    const seen = new Set(); const out = [];
+    const add = (o) => { if (o && !seen.has(o.id)) { seen.add(o.id); out.push(o); } };
+    for (const o of list) {
+        if (o.type === 'group') for (const cid of (o.childIds || [])) add(objs.find(x => x.id === cid));
+        add(o);
     }
-    state.selection = clones; commit();
+    return out.sort((a, b) => objs.indexOf(a) - objs.indexOf(b));
+}
+/* Clone objects with fresh ids. Group childIds are remapped onto the clones, so a
+   duplicated group owns its own copies instead of pointing at the originals
+   (which used to make both groups drag together and swallow each other's layers). */
+function cloneObjectsWithNewIds(list) {
+    const map = new Map();
+    const clones = list.map(o => {
+        const c = deepClone(o);
+        c.id = uid(o.type === 'group' ? 'grp' : 'obj');
+        map.set(o.id, c.id);
+        return c;
+    });
+    for (const c of clones) {
+        if (c.type === 'group' && Array.isArray(c.childIds)) c.childIds = c.childIds.map(id => map.get(id)).filter(Boolean);
+    }
+    return { clones, map };
+}
+
+function duplicateSelection() {
+    const sel = selectedObjects(); if (!sel.length) return;
+    const objs = curObjects();
+    const { clones, map } = cloneObjectsWithNewIds(withGroupChildren(sel, objs));
+    for (const c of clones) {
+        if (c.type === 'group') c.gt = { x: 0, y: 0, rot: 0, sx: 1, sy: 1 };
+        else { c.x += 24; c.y += 24; }
+    }
+    // only rename what the user actually picked, not the dragged-along children
+    for (const o of sel) { const c = clones.find(x => x.id === map.get(o.id)); if (c) c.name = o.name + ' copy'; }
+    objs.push(...clones);
+    state.selection = sel.map(o => map.get(o.id)).filter(Boolean);
+    commit();
 }
 function deleteSelection() {
     if (!state.selection.length) return;
@@ -2448,21 +2505,62 @@ function deleteSelection() {
 }
 function copySelection() {
     const sel = selectedObjects(); if (!sel.length) return;
-    state.clipboard = sel.map(deepClone);
+    const picked = withGroupChildren(sel, curObjects());
+    state.clipboard = { objects: picked.map(deepClone), rootIds: sel.map(o => o.id) };
     toast(sel.length + ' copied', '', 1200);
 }
 function pasteClipboard() {
-    if (!state.clipboard || !state.clipboard.length) return;
-    const objs = curObjects(); const ids = [];
-    for (const o of state.clipboard) {
-        const c = deepClone(o); c.id = uid('obj'); c.x += 24; c.y += 24; objs.push(c); ids.push(c.id);
+    const cb = state.clipboard;
+    const list = Array.isArray(cb) ? cb : (cb && cb.objects);   // legacy clipboard = plain array
+    if (!list || !list.length) return;
+    const objs = curObjects();
+    const { clones, map } = cloneObjectsWithNewIds(list);
+    for (const c of clones) {
+        if (c.type === 'group') c.gt = { x: 0, y: 0, rot: 0, sx: 1, sy: 1 };
+        else { c.x += 24; c.y += 24; }
     }
-    state.selection = ids; commit();
-    toast(ids.length + ' pasted', '', 1200);
+    objs.push(...clones);
+    const roots = (cb && cb.rootIds) || list.map(o => o.id);
+    state.selection = roots.map(id => map.get(id)).filter(Boolean);
+    commit();
+    toast(clones.length + ' pasted', '', 1200);
 }
 function moveLayer(dir) {
-    const sel = selectedObjects().filter(o => o.type !== 'group'); if (sel.length !== 1) return;
-    const objs = curObjects(); const i = objs.indexOf(sel[0]);
+    const sel = selectedObjects(); if (sel.length !== 1) return;
+    const objs = curObjects();
+    const o = sel[0];
+
+    if (o.type === 'group') {
+        // Move the group node and every child together, hopping over a whole
+        // neighbouring group at a time so z-order stays consistent.
+        const blockIds = groupBlockIds(o);
+        const block = objs.filter(x => blockIds.has(x.id));
+        if (!block.length) return;
+        const rest = objs.filter(x => !blockIds.has(x.id));
+        const firstIdx = objs.indexOf(block[0]);
+        let at = rest.findIndex(x => objs.indexOf(x) > firstIdx);
+        if (at < 0) at = rest.length;
+        if (dir === 'up' ? at >= rest.length : at === 0) return;
+        const nAt = dir === 'up' ? at : at - 1;
+        const neighbour = rest[nAt];
+        const ng = neighbour.type === 'group'
+            ? neighbour
+            : rest.find(x => x.type === 'group' && x.childIds && x.childIds.includes(neighbour.id));
+        let insertAt;
+        if (ng) {
+            const nb = groupBlockIds(ng);
+            const idxs = rest.map((x, i) => (nb.has(x.id) ? i : -1)).filter(i => i >= 0);
+            insertAt = dir === 'up' ? Math.max(...idxs) + 1 : Math.min(...idxs);
+        } else {
+            insertAt = dir === 'up' ? nAt + 1 : nAt;
+        }
+        rest.splice(insertAt, 0, ...block);
+        objs.length = 0; objs.push(...rest);
+        commit();
+        return;
+    }
+
+    const i = objs.indexOf(o);
     const j = dir === 'up' ? i + 1 : i - 1; // up = higher z = later in array
     if (j < 0 || j >= objs.length) return;
     [objs[i], objs[j]] = [objs[j], objs[i]];
@@ -2723,16 +2821,55 @@ function beginRename(span, o) {
     inp.addEventListener('blur', done);
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') inp.blur(); else if (e.key === 'Escape') { inp.value = o.name; inp.blur(); } e.stopPropagation(); });
 }
+/* All array entries belonging to a group: the group node plus its children. */
+function groupBlockIds(g) {
+    const s = new Set([g.id]);
+    for (const cid of (g.childIds || [])) s.add(cid);
+    return s;
+}
 function reorderLayer(draggedId, targetId, before) {
     if (draggedId === targetId) return;
     const objs = curObjects();
-    const di = objs.findIndex(o => o.id === draggedId);
-    if (di < 0) return;
-    const [moved] = objs.splice(di, 1);
-    let ti = objs.findIndex(o => o.id === targetId);
-    // display "before" (above) means higher z => insert AFTER target in array
-    if (before) ti = ti + 1;
-    objs.splice(ti, 0, moved);
+    const dragged = objs.find(o => o.id === draggedId);
+    if (!dragged) return;
+
+    if (dragged.type !== 'group') {
+        const di = objs.indexOf(dragged);
+        const [moved] = objs.splice(di, 1);
+        let ti = objs.findIndex(o => o.id === targetId);
+        if (ti < 0) { objs.splice(di, 0, moved); return; }
+        // display "before" (above) means higher z => insert AFTER target in array
+        if (before) ti = ti + 1;
+        objs.splice(ti, 0, moved);
+        commit();
+        return;
+    }
+
+    // A group moves as a block — the group node AND its children keep their
+    // relative order, so the whole group really changes z-index.
+    const blockIds = groupBlockIds(dragged);
+    if (blockIds.has(targetId)) return;
+    const block = objs.filter(o => blockIds.has(o.id));
+    const rest = objs.filter(o => !blockIds.has(o.id));
+
+    // If the drop target itself belongs to a group, land outside that whole block.
+    const targetObj = rest.find(o => o.id === targetId);
+    if (!targetObj) return;
+    const targetGroup = targetObj.type === 'group'
+        ? targetObj
+        : rest.find(o => o.type === 'group' && o.childIds && o.childIds.includes(targetId));
+    let ti;
+    if (targetGroup) {
+        const tb = groupBlockIds(targetGroup);
+        const idxs = rest.map((o, i) => (tb.has(o.id) ? i : -1)).filter(i => i >= 0);
+        ti = before ? Math.max(...idxs) + 1 : Math.min(...idxs);
+    } else {
+        ti = rest.indexOf(targetObj);
+        if (before) ti = ti + 1;
+    }
+    rest.splice(ti, 0, ...block);
+    objs.length = 0;
+    objs.push(...rest);
     commit();
 }
 
@@ -2787,12 +2924,39 @@ function getObjGroup(objId, page) {
 }
 function bakeGTintoChild(child, g, pivot) {
     if (!g.gt) return;
+    const sx = g.gt.sx || 1, sy = g.gt.sy || 1;
     const nc = applyGTtoPoint(g, pivot, child.x + (child.width||0)/2, child.y + (child.height||0)/2);
-    const nw = (child.width||0) * (g.gt.sx||1);
-    const nh = (child.height||0) * (g.gt.sy||1);
+    const nw = (child.width||0) * sx;
+    const nh = (child.height||0) * sy;
     child.x = nc.x - nw/2; child.y = nc.y - nh/2;
     child.width = nw; child.height = nh;
     child.rotation = ((child.rotation||0) + (g.gt.rot||0)) % 360;
+    // Text is drawn at a font size, not stretched by the box, so scale it too —
+    // otherwise the label snaps back to its old size when the group drag ends.
+    const s = Math.sqrt(Math.abs(sx * sy)) || 1;
+    if (child.type === 'text' && s !== 1) {
+        child.fontSize = Math.max(1, round((child.fontSize || 0) * s, 1));
+        if (child.minFontSize) child.minFontSize = Math.max(1, round(child.minFontSize * s, 1));
+        if (child.outlineWidth) child.outlineWidth = round(child.outlineWidth * s, 2);
+        if (child.letterSpacing) child.letterSpacing = round(child.letterSpacing * s, 2);
+    }
+}
+/* Bake a group's live transform into its children and reset it to identity.
+   The group transform is a *drag-time* construct only: its pivot is the children's
+   bounding-box centre, so keeping it around means editing one child moves the
+   pivot and visually drags every other child with it. Baking on drag end keeps
+   each child's own x/y/w/h authoritative and makes groups independent again. */
+function bakeGroupGT(g) {
+    if (!g || g.type !== 'group') return;
+    if (hasActiveGT(g)) {
+        const pg = curPage();
+        const pivot = computeGroupPivot(pg, g);
+        for (const cid of (g.childIds || [])) {
+            const c = pg.objects.find(o => o.id === cid);
+            if (c) bakeGTintoChild(c, g, pivot);
+        }
+    }
+    g.gt = { x: 0, y: 0, rot: 0, sx: 1, sy: 1 };
 }
 /* Returns a virtual object with the group transform applied (for overlay/hit-test use) */
 function virtualObjWithGT(obj, g, pivot) {
@@ -2837,7 +3001,7 @@ function bindNum(obj, prop, opts = {}) {
         if (opts.max != null) v = Math.min(opts.max, v);
         applyToTargets(obj, prop, v, opts.targetsAll); liveUpdate();
     });
-    inp.addEventListener('change', () => commit());
+    inp.addEventListener('change', () => { if (opts.onCommit) opts.onCommit(); else commit(); });
     return inp;
 }
 function bindRange(obj, prop, min, max, step, opts = {}) {
@@ -2929,6 +3093,10 @@ function renderGroupInspector(host, g) {
 
     const sxInp = el('input', { type: 'number', step: '0.01', min: '0.01', value: fmtNum(gt.sx || 1) });
     const syInp = el('input', { type: 'number', step: '0.01', min: '0.01', value: fmtNum(gt.sy || 1) });
+    // The group transform is only a live preview: as soon as the edit is finished
+    // it is written into the children, so a group never holds a standing transform
+    // that would re-apply itself whenever a single child is edited.
+    const bakeAndCommit = () => { bakeGroupGT(g); commit(); };
 
     const arLockBtn = el('button', {
         class: 'ar-lock-btn' + (grpArLocked ? ' on' : ''),
@@ -2956,7 +3124,7 @@ function renderGroupInspector(host, g) {
         }
         liveUpdate();
     });
-    sxInp.addEventListener('change', () => commit());
+    sxInp.addEventListener('change', () => bakeAndCommit());
     syInp.addEventListener('input', () => {
         let v = parseFloat(syInp.value); if (isNaN(v)) return;
         v = Math.max(0.01, v); gt.sy = v;
@@ -2966,7 +3134,7 @@ function renderGroupInspector(host, g) {
         }
         liveUpdate();
     });
-    syInp.addEventListener('change', () => commit());
+    syInp.addEventListener('change', () => bakeAndCommit());
 
     const scaleRow = el('div', { class: 'wh-row' },
         el('div', { class: 'field' }, el('label', { text: 'Scale X' }), sxInp),
@@ -2981,12 +3149,11 @@ function renderGroupInspector(host, g) {
             el('div', { class: 'mini', style: 'margin-top:6px', text: children.length + ' layer(s) in this group' })
         ]),
         group('Transform', 'grp-gt', [
-            el('div', { class: 'mini', text: 'Applied on top of all children. Pivot = bounding box center.' }),
-            row('X', bindNum(gt, 'x', { step: 1 })),
-            row('Y', bindNum(gt, 'y', { step: 1 })),
-            row('Rotation°', bindNum(gt, 'rot', { step: 1 })),
-            scaleRow,
-            el('button', { text: 'Reset transform', onclick: () => { Object.assign(g.gt, {x:0,y:0,rot:0,sx:1,sy:1}); commit(); } })
+            el('div', { class: 'mini', text: 'Nudge / scale every child at once (pivot = bounding box center). The values are applied to the layers themselves, so they reset to 0 / 1 after each edit.' }),
+            row('X', bindNum(gt, 'x', { step: 1, onCommit: bakeAndCommit })),
+            row('Y', bindNum(gt, 'y', { step: 1, onCommit: bakeAndCommit })),
+            row('Rotation°', bindNum(gt, 'rot', { step: 1, onCommit: bakeAndCommit })),
+            scaleRow
         ]),
         group('Actions', 'grp-actions', [
             el('button', { text: 'Ungroup (bake & keep layers)', onclick: () => ungroupGroup(g.id) }),
@@ -3808,7 +3975,16 @@ function duplicatePage(id) {
     const copy = deepClone(src);
     copy.id = uid('page');
     copy.name = src.name + ' copy';
-    for (const o of copy.objects) o.id = uid('obj');
+    // Fresh layer ids — remap group childIds too, otherwise the copied groups
+    // still point at the source page's layers and come out empty.
+    const idMap = new Map();
+    for (const o of copy.objects) {
+        const nid = uid(o.type === 'group' ? 'grp' : 'obj');
+        idMap.set(o.id, nid); o.id = nid;
+    }
+    for (const o of copy.objects) {
+        if (o.type === 'group' && Array.isArray(o.childIds)) o.childIds = o.childIds.map(id => idMap.get(id)).filter(Boolean);
+    }
     const i = state.project.pages.findIndex(p => p.id === src.id);
     state.project.pages.splice(i + 1, 0, copy);
     state.pageId = copy.id; state.selection = [];
@@ -4021,6 +4197,40 @@ function exportSingleLocFile(id) {
     toast('Exported ' + base + '.json — ' + f.keys.length + ' keys · ' + f.languages.length + ' lang', 'ok');
 }
 
+/* Every asset id whose filename carries the "_<lang>" suffix for this language. */
+function assetIdsForLang(code) {
+    code = canonLang(code);
+    const out = [];
+    for (const g of assetGroups().byBase.values()) if (g.byLang[code]) out.push(g.byLang[code]);
+    return out;
+}
+/* Remove a language from the project. Strips it from every localization file and,
+   when the language only exists because of "name_xx.png" image variants, deletes
+   those variants too — otherwise it would reappear the moment the panel re-renders. */
+function removeLanguagePrompt(code) {
+    code = canonLang(code);
+    const imgs = state.project.assets.images;
+    const assetIds = assetIdsForLang(code).filter(id => imgs[id]);
+    let msg = 'Remove language "' + code.toUpperCase() + ' — ' + langEnglishName(code) + '"?\n\n' +
+        'All its translations will be deleted from every localization file.';
+    if (assetIds.length) {
+        msg += '\n\nIt is also provided by ' + assetIds.length + ' language-variant image(s):\n' +
+            assetIds.map(id => '• ' + imgs[id].name).join('\n') +
+            '\n\nThose images will be deleted too (layers using them keep their other variant).';
+    }
+    msg += '\n\nThis can be undone with Ctrl+Z.';
+    if (!confirm(msg)) return;
+    for (const id of assetIds) {
+        delete imgs[id];
+        delete state.imageCache[id];
+        _nsCache.delete(id);
+        for (const pg of state.project.pages) for (const o of pg.objects) if (o.type === 'image' && o.assetId === id) o.assetId = null;
+    }
+    if (assetIds.length) _assetGroupCache = null;
+    removeLanguageEverywhere(code);   // commits
+    refreshAll(); openLocManager();
+}
+
 /* Searchable panel to add a language by its universal code. */
 function openAddLanguagePanel() {
     const back = $('#modal-generic');
@@ -4074,9 +4284,10 @@ function openLocManager() {
     const totalKeys = allLocKeys().length;
 
     const table = el('table', { class: 'data' });
-    table.append(el('tr', {}, el('th', { text: 'File' }), el('th', { text: 'Type' }), el('th', { text: 'Languages' }), el('th', { text: 'Keys' }), el('th', { text: '' })));
+    table.append(el('tr', {}, el('th', { text: 'File' }), el('th', { text: 'Type' }), el('th', { text: 'Languages' }),
+        el('th', { text: '# Lang' }), el('th', { text: 'Keys' }), el('th', { text: '' })));
     if (!files.length) {
-        table.append(el('tr', {}, el('td', { colspan: 5, class: 'mini', text: 'No localization files loaded yet.' })));
+        table.append(el('tr', {}, el('td', { colspan: 6, class: 'mini', text: 'No localization files loaded yet.' })));
     } else for (const f of files) {
         let langCell;
         if (f.languages.length === 1) {
@@ -4091,7 +4302,8 @@ function openLocManager() {
             el('button', { text: 'Replace', onclick: () => replaceLocFile(f.id) }),
             el('button', { text: '⬇ Export', title: 'Export only this file (JSON Format A)', onclick: () => exportSingleLocFile(f.id) }),
             el('button', { class: 'danger', text: 'Remove', onclick: () => removeLocFile(f.id) }));
-        table.append(el('tr', {}, el('td', { text: f.name }), el('td', { text: f.format.toUpperCase() }), el('td', {}, langCell), el('td', { text: f.keys.length }), el('td', {}, actions)));
+        table.append(el('tr', {}, el('td', { text: f.name }), el('td', { text: f.format.toUpperCase() }), el('td', {}, langCell),
+            el('td', { text: f.languages.length }), el('td', { text: f.keys.length }), el('td', {}, actions)));
     }
 
     const help = el('div', { class: 'help', style: 'margin-top:14px' });
@@ -4104,21 +4316,20 @@ function openLocManager() {
 
     const summary = el('div', { class: 'mini', style: 'margin:6px 0 12px' }, `${files.length} file(s) · ${langs.length} language(s) [${langs.join(', ') || '—'}] · ${totalKeys} unique key(s)`);
 
-    // --- Languages section: chips (removable) + Add Language ---
-    const removable = new Set(fileLangs());
+    // --- Languages section: chips (all removable) + Add Language ---
+    const fromFiles = new Set(fileLangs());
     const chips = el('div', { class: 'ctl', style: 'flex-wrap:wrap;gap:6px;margin:4px 0 12px' });
     if (!langs.length) chips.append(el('span', { class: 'mini', text: 'No languages yet — add one to start localizing.' }));
     for (const l of langs) {
+        const imgOnly = !fromFiles.has(l);
         const label = l.toUpperCase() + ' · ' + langEnglishName(l) + (langDisplayName(l) === langEnglishName(l) ? '' : ' · ' + langDisplayName(l));
-        const chip = el('span', { class: 'tag', style: 'display:inline-flex;align-items:center;gap:6px', text: label });
-        if (removable.has(l)) {
-            const x = el('button', { class: 'danger', style: 'padding:0 6px;line-height:1.4;font-size:11px', title: 'Remove language', text: '✕' });
-            x.addEventListener('click', () => {
-                if (!confirm('Remove language "' + l.toUpperCase() + ' — ' + langEnglishName(l) + '"?\nAll its translations will be deleted from every file. This cannot be undone (except via Undo).')) return;
-                removeLanguageEverywhere(l); refreshAll(); openLocManager();
-            });
-            chip.append(x);
-        }
+        const chip = el('span', {
+            class: 'tag', style: 'display:inline-flex;align-items:center;gap:6px',
+            title: imgOnly ? 'Comes from "name_' + l + '.<ext>" image variants only' : 'Defined in a localization file'
+        }, (imgOnly ? '🖼 ' : '') + label);
+        const x = el('button', { class: 'danger', style: 'padding:0 6px;line-height:1.4;font-size:11px', title: 'Remove language', text: '✕' });
+        x.addEventListener('click', () => removeLanguagePrompt(l));
+        chip.append(x);
         chips.append(chip);
     }
     const langSection = el('div', {},
@@ -4404,9 +4615,13 @@ function exportFilename(pageName, lang, withSuffix, fmtExt) {
     return base + suff + '.' + fmtExt;
 }
 
-function openExportWizard() {
+/* opts.onlyCurrent → export wizard restricted to the active canvas only. */
+function openExportWizard(opts = {}) {
     const langs = langList();
     const es = state.project.exportSettings;
+    const onlyCurrent = opts.onlyCurrent === true;
+    const exportPages = onlyCurrent ? [curPage()].filter(Boolean) : state.project.pages;
+    if (!exportPages.length) { toast('No page to export', 'warn'); return; }
 
     // format radios
     const fmtWrap = el('div', { class: 'radio-card' });
@@ -4462,19 +4677,21 @@ function openExportWizard() {
     // pages
     const pageWrap = el('div', { class: 'lang-pick' });
     const pageChecks = {};
-    state.project.pages.forEach(pg => {
+    exportPages.forEach(pg => {
         const c = el('input', { type: 'checkbox' }); c.checked = true; pageChecks[pg.id] = c;
         c.addEventListener('change', updateExample);
+        if (onlyCurrent) c.disabled = true;
         pageWrap.append(el('label', {}, c, ' ' + pg.name));
     });
+    if (onlyCurrent) pageWrap.append(el('span', { class: 'mini', style: 'align-self:center', text: '(current canvas only)' }));
 
-    // resolution scale
-    const initScale = Math.round((es.scale || 1) * 100);
+    // resolution scale — always starts at 100%; scaling down is an explicit choice
+    const initScale = 100;
     const scaleSlider = el('input', { type: 'range', min: 1, max: 100, step: 1, value: initScale });
     const scaleBadge = el('span', { class: 'val-badge', text: initScale + '%' });
     const scaleDims = el('span', { class: 'mini', style: 'color:var(--text-dim)' });
     function updateScaleDims() {
-        const pg = state.project.pages.find(p => pageChecks[p.id] && pageChecks[p.id].checked);
+        const pg = exportPages.find(p => pageChecks[p.id] && pageChecks[p.id].checked);
         if (!pg) { scaleDims.textContent = ''; return; }
         const res = pageResolution(pg); const s = parseInt(scaleSlider.value) / 100;
         scaleDims.textContent = '  ' + Math.round(res.width * s) + ' × ' + Math.round(res.height * s) + ' px';
@@ -4490,19 +4707,22 @@ function openExportWizard() {
     function curOrg() { return (orgRadios.find(r => r.checked) || orgRadios[0]).value; }
     function updateQualityVis() { qualityRow.style.display = FORMAT_INFO[curFmt()].lossy ? '' : 'none'; updateExample(); }
     function selectedLangs() { return langs.length ? langs.filter(l => langChecks[l].checked) : ['__key']; }
+    function zipName() {
+        return slug(state.project.name) + (onlyCurrent ? '_' + slug(exportPages[0].name) : '') + '_export.zip';
+    }
     function updateExample() {
         const fmt = FORMAT_INFO[curFmt()];
         const org = curOrg();
         const sl = selectedLangs();
-        const firstPage = state.project.pages.find(p => pageChecks[p.id].checked);
+        const firstPage = exportPages.find(p => pageChecks[p.id].checked);
         if (!firstPage || !sl.length) { example.textContent = 'Nothing selected to export.'; return; }
         // collision guard: flat + no suffix + multiple langs
         const lang = sl[0];
         const withSuffix = suffixChk.checked || (org === 'flat' && sl.length > 1);
         const fn = exportFilename(firstPage.name, lang, withSuffix, fmt.ext);
         const path = (org === 'folders' && lang !== '__key' ? lang + '/' : '') + fn;
-        const count = sl.length * state.project.pages.filter(p => pageChecks[p.id].checked).length;
-        example.textContent = 'Example: ' + path + '\n' + count + ' image(s) → ' + slug(state.project.name) + '_export.zip';
+        const count = sl.length * exportPages.filter(p => pageChecks[p.id].checked).length;
+        example.textContent = 'Example: ' + path + '\n' + count + ' image(s) → ' + zipName();
     }
     updateQualityVis();
 
@@ -4520,7 +4740,7 @@ function openExportWizard() {
     runBtn.addEventListener('click', async () => {
         const fmtKey = curFmt(); const fmt = FORMAT_INFO[fmtKey]; const org = curOrg();
         const sl = selectedLangs();
-        const pages = state.project.pages.filter(p => pageChecks[p.id].checked);
+        const pages = exportPages.filter(p => pageChecks[p.id].checked);
         if (!pages.length || !sl.length) { toast('Select at least one page and language', 'warn'); return; }
         const withSuffix = suffixChk.checked || (org === 'flat' && sl.length > 1);
         const exportScale = parseInt(scaleSlider.value) / 100;
@@ -4546,7 +4766,7 @@ function openExportWizard() {
                 }
             }
             const zip = buildZip(files);
-            downloadBlob(zip, slug(state.project.name) + '_export.zip');
+            downloadBlob(zip, zipName());
             toast('Exported ' + files.length + ' image(s)', 'ok');
             closeModal($('#modal-export'));
         } catch (e) {
@@ -4555,7 +4775,8 @@ function openExportWizard() {
         }
     });
 
-    openModal($('#modal-export'), 'Export Wizard', body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-export')) }), runBtn]);
+    const title = onlyCurrent ? 'Export Current Canvas — ' + exportPages[0].name : 'Export Wizard';
+    openModal($('#modal-export'), title, body, [el('button', { text: 'Cancel', onclick: () => closeModal($('#modal-export')) }), runBtn]);
 }
 
 /* ---------------------------- Project I/O ------------------------------- */
@@ -4583,6 +4804,21 @@ function migrateProject(p) {
     p.assets.fonts = p.assets.fonts || {};
     p.localization = p.localization || { files: [] };
     p.localization.files = p.localization.files || [];
+    // Canonicalise language codes so an older project that carries both "zh-CN"
+    // and "zh-cn" collapses into the single language "zh-CN".
+    for (const f of p.localization.files) {
+        f.languages = Array.from(new Set((f.languages || []).map(canonLang))).filter(Boolean);
+        f.data = f.data || {};
+        for (const k of Object.keys(f.data)) {
+            const row = f.data[k]; if (!row || typeof row !== 'object') continue;
+            const merged = {};
+            for (const l of Object.keys(row)) {
+                const c = canonLang(l); if (!c) continue;
+                if (merged[c] == null || merged[c] === '') merged[c] = row[l];
+            }
+            f.data[k] = merged;
+        }
+    }
     p.fontAssignment = p.fontAssignment || { global: null, perLanguage: {} };
     p.fontAssignment.perLanguage = p.fontAssignment.perLanguage || {};
     p.exportSettings = p.exportSettings || { format: 'png', quality: 0.92, naming: 'suffix', organize: 'folders', languages: null, scale: 1 };
@@ -4620,6 +4856,25 @@ function migrateProject(p) {
                 pg.objects.splice(i + 1, 0, inner, grp);
                 i += 2;
             }
+        }
+        // Repair group membership: drop dangling child ids and make sure a layer
+        // belongs to at most one group (duplicated groups used to share children).
+        const known = new Set(pg.objects.map(o => o.id));
+        const claimed = new Set();
+        for (const g of pg.objects) {
+            if (g.type !== 'group') continue;
+            g.childIds = (g.childIds || []).filter(id => known.has(id) && id !== g.id && !claimed.has(id));
+            for (const id of g.childIds) claimed.add(id);
+        }
+        // Older saves could persist a live group transform — bake it into the
+        // children so no group carries a standing transform any more.
+        for (const g of pg.objects) {
+            if (g.type !== 'group') continue;
+            if (g.gt && hasActiveGT(g)) {
+                const pivot = computeGroupPivot(pg, g);
+                for (const cid of g.childIds) { const c = pg.objects.find(o => o.id === cid); if (c) bakeGTintoChild(c, g, pivot); }
+            }
+            g.gt = { x: 0, y: 0, rot: 0, sx: 1, sy: 1 };
         }
     }
     return p;
@@ -4749,18 +5004,30 @@ function setupCanvasDrop() {
             const before = Object.keys(state.project.assets.images);
             await importAssets(e.dataTransfer.files);
             const after = Object.keys(state.project.assets.images).filter(id => !before.includes(id));
-            if (after.length) placeImageAt(after[0], p);
+            // Wait for decode — otherwise naturalWidth is still 0 and the layer
+            // would be created as a default 400×400 square instead of the
+            // image's real aspect ratio.
+            if (after.length) { await assetImageReady(after[0]); placeImageAt(after[0], p); }
         }
+    });
+}
+/* Resolve once the asset's <img> has decoded (or immediately if it already has). */
+function assetImageReady(assetId) {
+    const im = state.imageCache[assetId];
+    if (!im) return Promise.resolve(null);
+    if (im.complete && im.naturalWidth) return Promise.resolve(im);
+    return new Promise((res) => {
+        const done = () => res(im.naturalWidth ? im : null);
+        im.addEventListener('load', done, { once: true });
+        im.addEventListener('error', () => res(null), { once: true });
+        setTimeout(done, 4000); // never hang the drop on a broken asset
     });
 }
 function placeImageAt(assetId, p) {
     const im = state.imageCache[assetId];
+    // Dropped images land at their real pixel size — the user resizes from there.
     let w = 400, h = 400;
-    if (im && im.naturalWidth) {
-        const res = pageResolution();
-        const sc = Math.min(1, (res.width * 0.5) / im.naturalWidth, (res.height * 0.5) / im.naturalHeight);
-        w = Math.round(im.naturalWidth * sc); h = Math.round(im.naturalHeight * sc);
-    }
+    if (im && im.naturalWidth) { w = im.naturalWidth; h = im.naturalHeight; }
     const o = newImageObject(Math.round(p.x - w / 2), Math.round(p.y - h / 2), assetId, w, h);
     o.name = state.project.assets.images[assetId].name.replace(/\.[^.]+$/, '');
     addObject(o);
@@ -4801,7 +5068,8 @@ function setupToolbar() {
     $('#btn-loc').onclick = openLocManager;
     $('#btn-fonts').onclick = openFontManager;
     $('#btn-legal').onclick = openLegalPanel;
-    $('#btn-export').onclick = openExportWizard;
+    $('#btn-export').onclick = () => openExportWizard();
+    $('#btn-export-page').onclick = () => openExportWizard({ onlyCurrent: true });
 
     $('#lyr-up').onclick = () => moveLayer('up');
     $('#lyr-down').onclick = () => moveLayer('down');
