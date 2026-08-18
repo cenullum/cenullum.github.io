@@ -670,7 +670,10 @@ function newGroupObject(name) {
     return { id: uid('grp'), type: 'group', name: name || 'Group', visible: true, locked: false, groupMove: true, childIds: [], hue, gt: { x:0, y:0, rot:0, sx:1, sy:1 } };
 }
 function newImageObject(x, y, assetId, w, h) {
-    return Object.assign(baseObj('image', 'Image', x, y, w || 400, h || 400), {
+    const fw = w || 400, fh = h || 400;
+    return Object.assign(baseObj('image', 'Image', x, y, fw, fh), {
+        // New image layers keep their aspect ratio locked by default; the user can unlock it later.
+        arLocked: true, arLockedRatio: fw / fh,
         assetId: assetId || null, scale: 1, tintEnabled: false, tint: '#ffffff',
         flipX: false, flipY: false, blur: 0, glow: 0, glowColor: '#ffd479',
         shadow: false, shadowColor: '#000000', shadowBlur: 8, shadowOffsetX: 0, shadowOffsetY: 6,
@@ -2419,6 +2422,27 @@ function doGroupMove(p) {
     requestCanvas(); updateStatus();
 }
 
+/* Fit an object's width/height to the current page's canvas.
+   mode: 'stretch' fills both sides (ignores AR); 'width'/'height' fit that side
+   and derive the other from the aspect ratio, so it may overflow or fall short. */
+function fitToCanvas(o, mode, ratio) {
+    const res = pageResolution();
+    if (mode === 'stretch') {
+        o.width = res.width; o.height = res.height; o.x = 0; o.y = 0;
+        return;
+    }
+    const r = ratio || o.arLockedRatio || (o.width / o.height);
+    if (mode === 'width') {
+        o.width = res.width;
+        o.height = Math.max(1, Math.round(res.width / r));
+        o.x = 0; o.y = Math.round((res.height - o.height) / 2);
+    } else {
+        o.height = res.height;
+        o.width = Math.max(1, Math.round(res.height * r));
+        o.y = 0; o.x = Math.round((res.width - o.width) / 2);
+    }
+}
+
 /* ---------------------- Object ops & Hierarchy -------------------------- */
 function placePos(w, h) {
     const res = pageResolution();
@@ -3323,7 +3347,12 @@ function makeWHSection(o) {
         naturalAR !== null ? mkFit('⊙ Orig AR', 'Restore original asset aspect ratio (adjusts height)', () => {
             o.height = Math.max(1, Math.round(o.width / naturalAR));
             const res = pageResolution(); o.y = Math.round((res.height - o.height) / 2);
-        }) : null
+        }) : null,
+        mkFit('⤢ Fit Cv', 'Fit to Canvas — stretches if AR is unlocked, otherwise asks which side to fit', () => {
+            if (!arLocked) { fitToCanvas(o, 'stretch'); return; }
+            const wantWidth = confirm('Aspect ratio is locked — fit which side to the canvas?\n\nOK = Fit Width (height follows the ratio)\nCancel = Fit Height (width follows the ratio)\n\nThe other side may overflow or fall short of the canvas.');
+            fitToCanvas(o, wantWidth ? 'width' : 'height', lockedRatio);
+        })
     );
 
     return [whRow, fitRow];
@@ -5025,10 +5054,12 @@ function assetImageReady(assetId) {
 }
 function placeImageAt(assetId, p) {
     const im = state.imageCache[assetId];
-    // Dropped images land at their real pixel size — the user resizes from there.
+    // Dropped images start from their real pixel size, then auto-fit to the
+    // canvas width (aspect ratio preserved) so they land at a usable size.
     let w = 400, h = 400;
     if (im && im.naturalWidth) { w = im.naturalWidth; h = im.naturalHeight; }
     const o = newImageObject(Math.round(p.x - w / 2), Math.round(p.y - h / 2), assetId, w, h);
+    fitToCanvas(o, 'width');
     o.name = state.project.assets.images[assetId].name.replace(/\.[^.]+$/, '');
     addObject(o);
 }
