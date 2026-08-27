@@ -3613,11 +3613,10 @@ function openNineSliceModal(o) {
 }
 
 function renderImageInspector(host, o) {
-    const imgOpts = [{ value: '', label: '— none —' }].concat(Object.keys(state.project.assets.images).map(id => ({ value: id, label: state.project.assets.images[id].name })));
     const thumb = o.assetId && state.project.assets.images[o.assetId];
     host.append(
         group('Source', 'source', [
-            row('Asset', bindSelect(o, 'assetId', imgOpts, { nullable: true })),
+            row('Asset', assetPickerButton(o, thumb)),
             thumb ? el('img', { src: thumb.data, style: 'max-width:100%;max-height:120px;object-fit:contain;border:1px solid var(--border);border-radius:3px;background:#0a0a0a' }) : el('div', { class: 'mini', text: 'No asset assigned — this layer renders the Fill below.' })
         ]),
         geomGroup(o, [field('Scale', bindNum(o, 'scale', { step: 0.05, min: 0.01 }))]),
@@ -3656,6 +3655,47 @@ function renderImageInspector(host, o) {
                 field('Sh. Y', bindNum(o, 'shadowOffsetY', { step: 1 }))),
         ])
     );
+}
+
+/* Thumbnail-based asset picker: shows the current image (not just its name) and
+   opens a visual grid to pick a new one, instead of a text-only <select>. */
+function assetPickerButton(o, thumb) {
+    const btn = el('button', {
+        class: 'asset-pick-btn',
+        style: 'display:flex;align-items:center;gap:8px;width:100%;padding:4px 8px;text-align:left;'
+            + 'background:var(--surface-2);border:1px solid var(--border);border-radius:3px;color:var(--text-light);cursor:pointer'
+    },
+        el('img', {
+            src: thumb ? thumb.data : '',
+            style: 'width:28px;height:28px;object-fit:contain;border-radius:2px;background:#0a0a0a;flex:0 0 auto;'
+                + (thumb ? '' : 'visibility:hidden')
+        }),
+        el('span', { style: 'overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px', text: thumb ? thumb.name : '— none —' })
+    );
+    btn.onclick = () => openImageAssetPicker(o);
+    return btn;
+}
+
+function openImageAssetPicker(o) {
+    const back = $('#modal-generic');
+    const imgs = state.project.assets.images;
+    const ids = Object.keys(imgs);
+    const grid = el('div', { class: 'asset-grid' });
+    const noneCard = el('div', { class: 'asset', style: 'cursor:pointer;display:flex;align-items:center;justify-content:center;min-height:96px' },
+        el('div', { class: 'mini', text: '— none —' }));
+    noneCard.onclick = () => { o.assetId = null; commit(); closeModal(back); renderInspector(); };
+    grid.append(noneCard);
+    for (const id of ids) {
+        const a = imgs[id];
+        const card = el('div', { class: 'asset', style: 'cursor:pointer', title: a.name },
+            el('img', { class: 'thumb', src: a.data, draggable: 'false' }),
+            el('div', { class: 'nm', text: a.name })
+        );
+        card.onclick = () => { o.assetId = id; commit(); closeModal(back); renderInspector(); };
+        grid.append(card);
+    }
+    if (!ids.length) grid.append(el('div', { class: 'mini', style: 'grid-column:1/-1', text: 'No images imported yet.' }));
+    openModal(back, 'Choose Image', grid, [el('button', { text: 'Cancel', onclick: () => closeModal(back) })], 'lg');
 }
 
 function renderMultiInspector(host, sel) {
@@ -5035,8 +5075,12 @@ function setupCanvasDrop() {
             const after = Object.keys(state.project.assets.images).filter(id => !before.includes(id));
             // Wait for decode — otherwise naturalWidth is still 0 and the layer
             // would be created as a default 400×400 square instead of the
-            // image's real aspect ratio.
-            if (after.length) { await assetImageReady(after[0]); placeImageAt(after[0], p); }
+            // image's real aspect ratio. Place every dropped image, cascading
+            // each one so a multi-file drop doesn't stack them all in one spot.
+            for (let i = 0; i < after.length; i++) {
+                await assetImageReady(after[i]);
+                placeImageAt(after[i], { x: p.x + i * 24, y: p.y + i * 24 });
+            }
         }
     });
 }
