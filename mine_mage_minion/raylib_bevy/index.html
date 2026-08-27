@@ -201,20 +201,23 @@ footer .steam{margin-top:16px}
     <p><b>Mine Mage Minion</b> started life as a hand-rolled C++ game on top of <b>raylib</b>. It worked, but the
     frame rate fell off a cliff the moment the screen filled with enemies, which is exactly what a wave-survival
     game is supposed to do.</p>
-    <p>On the raylib side I had also hand-rolled my own ECS, and I just wasn't good enough at it. It kept producing
-    undefined behavior: weird bugs that only showed up at runtime, memory management issues I didn't fully
-    understand, hours lost chasing crashes with no clear cause. Bevy's ECS is battle-tested and none of that
-    class of bug happens anymore.</p>
-    <p>So I ported the whole thing 1:1 to <b>Bevy</b> (Rust). Same game, same systems, same content, different
-    engine. This page is the honest before/after: frame rate under enemy load, and how big the builds ended up
-    on each platform.</p>
+    <p>To be clear, that's on me, not on raylib. <b>raylib</b> is a solid, well-built library, it's just a thin
+    layer close to the metal, so it hands you the wheel on things like your ECS and memory management instead
+    of doing it for you. On the raylib side I had hand-rolled my own ECS, and I just wasn't good enough at it.
+    It kept producing undefined behavior: weird bugs that only showed up at runtime, memory management issues
+    I didn't fully understand, hours lost chasing crashes with no clear cause. Bevy's ECS is battle-tested and
+    handles that for me out of the box, so that whole class of bug doesn't happen anymore, but a raylib dev who
+    actually knows what they're doing wouldn't have run into most of this in the first place.</p>
+    <p>So I ported the whole thing 1:1 to <b>Bevy 0.19</b> (Rust), coming from <b>raylib 6.0</b> (C++).
+    Same game, same systems, same content, different engine. This page is the honest before/after: frame rate
+    under enemy load, and how big the builds ended up on each platform.</p>
     <p>Short version: raylib wins on an empty map and on download size. Bevy wins everywhere that actually
     matters once the game gets busy, <b>2.2× the frame rate at 1000 enemies</b>, and it stops falling apart
-    where raylib drops below 30.</p>
+    where raylib drops below 30, though a more experienced raylib dev could likely close a lot of that gap.</p>
     <p>Both versions were benchmarked on the same laptop: a <b>GTX 1650 Mobile</b>, <b>Ryzen 5 3550H</b>, 32 GB
-    dual-channel RAM at 2400 MHz. Take the exact numbers with a grain of salt, I'm not that good at optimizing
-    either engine, so these could shift by 10&ndash;15 fps with better tuning on either side. The overall shape
-    of the comparison should still hold.</p>
+    dual-channel RAM at 2400 MHz, running <b>CachyOS Linux</b>. Take the exact numbers with a grain of salt,
+    I'm not that good at optimizing either engine, so these could shift by 10&ndash;15 fps with better tuning
+    on either side. The overall shape of the comparison should still hold.</p>
   </div>
 
   <div class="stats">
