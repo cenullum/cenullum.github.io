@@ -521,13 +521,17 @@ function el(tag, attrs = {}, ...kids) {
     return n;
 }
 
-let _toastTimer = [];
+let _toastQueue = [];
 function toast(msg, type = '', ms = 3000) {
     const t = el('div', { class: 'toast ' + type, text: msg });
     $('#toasts').append(t);
-    const id = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 200); }, ms);
-    _toastTimer.push(id);
-    if (_toastTimer.length > 6) clearTimeout(_toastTimer.shift());
+    const timer = setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 200); }, ms);
+    _toastQueue.push({ t, timer });
+    if (_toastQueue.length > 6) {
+        const old = _toastQueue.shift();
+        clearTimeout(old.timer);
+        old.t.remove();
+    }
 }
 
 function downloadBlob(blob, filename) {
