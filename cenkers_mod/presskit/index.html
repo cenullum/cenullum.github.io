@@ -111,12 +111,36 @@
             overflow: hidden;
             padding: 56px 20px 64px;
             text-align: center;
-            background:
-                repeating-conic-gradient(from 0deg at 50% 45%,
-                    rgba(255, 255, 255, 0.07) 0deg 9deg,
-                    rgba(255, 255, 255, 0) 9deg 18deg),
-                radial-gradient(circle at 50% 45%, var(--purple-light), var(--purple) 45%, var(--purple-dark) 100%);
+            background: radial-gradient(circle at 50% 45%, var(--purple-light), var(--purple) 45%, var(--purple-dark) 100%);
             border-bottom: 5px solid var(--outline);
+            isolation: isolate;
+        }
+
+        /* Slowly rotating sunburst rays behind the hero */
+        .hero::before {
+            content: "";
+            position: absolute;
+            left: 50%;
+            top: 45%;
+            width: 300vmax;
+            height: 300vmax;
+            margin: -150vmax 0 0 -150vmax;
+            background: repeating-conic-gradient(rgba(255, 255, 255, 0.07) 0deg 9deg, rgba(255, 255, 255, 0) 9deg 18deg);
+            animation: sunburst-spin 90s linear infinite;
+            z-index: -1;
+            pointer-events: none;
+        }
+
+        @keyframes sunburst-spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero::before {
+                animation: none;
+            }
         }
 
         .hero img.logo {
