@@ -823,7 +823,7 @@
         <section id="trailer">
             <h2>Watch the <span class="hl">Trailer</span></h2>
             <div class="youtube-container">
-                <iframe src="https://www.youtube-nocookie.com/embed/t8RAWG0HuKw" title="cenker's mod trailer"
+                <iframe src="https://www.youtube.com/embed/t8RAWG0HuKw" title="cenker's mod trailer"
                     allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                     allowfullscreen></iframe>
             </div>
@@ -982,7 +982,7 @@
                 game.shots.forEach(shot => {
                     const file = `${slug}_${shot}`;
                     grid.appendChild(mediaCard({
-                        preview: `screenshots/_preview/${slug}/${file}.webp`,
+                        preview: `screenshots/preview/${slug}/${file}.webp`,
                         full: `screenshots/${slug}/${file}.png`,
                         label: `${game.name} — ${prettify(shot)}`
                     }));
