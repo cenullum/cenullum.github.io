@@ -805,7 +805,8 @@ function renderScoringSliders(item) {
 function buildPeerTrack(track, featId, item, slider) {
     const peers = appState.items
         .filter(i => i.id !== item.id && i.scores[featId] !== undefined)
-        .sort((a, b) => a.scores[featId] - b.scores[featId]);
+        .sort((a, b) => a.scores[featId] - b.scores[featId])
+        .map(p => ({ item: p, score: p.scores[featId] }));
 
     if (peers.length === 0) {
         track.classList.add('empty');
@@ -813,70 +814,149 @@ function buildPeerTrack(track, featId, item, slider) {
         return;
     }
 
-    track._peers = peers.map(p => {
-        const score = p.scores[featId];
-        const el = document.createElement('div');
-        el.className = 'peer';
-
-        const avatar = document.createElement('div');
-        avatar.className = 'peer-avatar';
-        if (p.imageBase64) {
-            const img = document.createElement('img');
-            img.src = p.imageBase64;
-            img.alt = p.name;
-            avatar.appendChild(img);
-        } else {
-            avatar.textContent = p.name.charAt(0).toUpperCase();
-        }
-
-        const name = document.createElement('div');
-        name.className = 'peer-name';
-        name.textContent = p.name;
-
-        el.append(avatar, name);
-        el.onclick = () => {
-            slider.value = score;
-            slider.dispatchEvent(new Event('input'));
-        };
-        el.onmouseenter = () => showPeerPreview(el, p, score);
-        el.onmouseleave = hidePeerPreview;
-        track.appendChild(el);
-
-        const tick = document.createElement('div');
-        tick.className = 'peer-tick';
-        track.appendChild(tick);
-        return { el, tick, score };
-    });
-
-    highlightEqualPeers(track, parseFloat(slider.value));
+    track._peers = peers;
+    track._slider = slider;
 }
 
 const PEER_WIDTH = 56;  // avatar + truncated name label
 const PEER_HEIGHT = 46;
 const PEER_GAP = 4;
 const PEER_TICK = 8;
+const PEER_MAX_ROWS = 2;
 
-// Greedy row packing: an avatar goes in the lowest row where it doesn't overlap its left neighbour.
+// Merges peers whose positions are closer than `radius` px into one group.
+function groupPeers(peers, width, radius) {
+    const groups = [];
+    peers.forEach(p => {
+        const x = (p.score / 10) * width;
+        const last = groups[groups.length - 1];
+        if (last && x - last.minX < radius) {
+            last.members.push(p);
+            last.maxX = x;
+        } else {
+            groups.push({ members: [p], minX: x, maxX: x });
+        }
+    });
+    // Keep labels inside the panel at the 0/10 ends; the tick still marks the exact spot.
+    const half = PEER_WIDTH / 2;
+    groups.forEach(g => g.x = Math.min(Math.max((g.minX + g.maxX) / 2, half), width - half));
+    return groups;
+}
+
+// Greedy row packing: a group goes in the lowest row where it doesn't overlap its left neighbour.
+function packRows(groups) {
+    const rowRight = [];
+    groups.forEach(g => {
+        let row = rowRight.findIndex(r => g.x - r >= PEER_WIDTH + PEER_GAP);
+        if (row === -1) {
+            row = rowRight.length;
+            rowRight.push(-Infinity);
+        }
+        rowRight[row] = g.x;
+        g.row = row;
+    });
+    return rowRight.length;
+}
+
+// Shows each peer separately while they fit in PEER_MAX_ROWS; otherwise merges nearby
+// peers into groups, widening the merge radius until the track stays compact.
 function layoutPeerTrack(track) {
     if (!track._peers) return;
     const width = track.clientWidth;
     if (!width) return;
 
-    const rowRight = [];
-    track._peers.forEach(({ el, tick, score }) => {
-        const x = (score / 10) * width;
-        let row = rowRight.findIndex(r => x - r >= PEER_WIDTH + PEER_GAP);
-        if (row === -1) {
-            row = rowRight.length;
-            rowRight.push(-Infinity);
-        }
-        rowRight[row] = x;
-        el.style.left = x + 'px';
-        el.style.bottom = (PEER_TICK + row * (PEER_HEIGHT + PEER_GAP)) + 'px';
-        tick.style.left = x + 'px';
+    let radius = 0;
+    let groups, rows;
+    while (true) {
+        groups = groupPeers(track._peers, width, radius);
+        rows = packRows(groups);
+        if (rows <= PEER_MAX_ROWS || groups.length === 1) break;
+        radius += PEER_WIDTH / 2;
+    }
+
+    track.innerHTML = '';
+    track._groups = groups;
+    groups.forEach(g => {
+        const tick = document.createElement('div');
+        tick.className = 'peer-tick';
+        tick.style.left = g.minX + 'px';
+        tick.style.width = Math.max(2, g.maxX - g.minX) + 'px';
+        track.appendChild(tick);
+
+        const el = g.members.length === 1
+            ? createPeerEl(g.members[0], track._slider)
+            : createPeerGroupEl(g.members, track._slider);
+        el.style.left = g.x + 'px';
+        el.style.bottom = (PEER_TICK + g.row * (PEER_HEIGHT + PEER_GAP)) + 'px';
+        track.appendChild(el);
+        g.el = el;
+        g.tick = tick;
     });
 
-    track.style.height = (PEER_TICK + rowRight.length * (PEER_HEIGHT + PEER_GAP)) + 'px';
+    track.style.height = (PEER_TICK + rows * (PEER_HEIGHT + PEER_GAP)) + 'px';
+    highlightEqualPeers(track, parseFloat(track._slider.value));
+}
+
+function createPeerAvatar(peer) {
+    const avatar = document.createElement('div');
+    avatar.className = 'peer-avatar';
+    if (peer.item.imageBase64) {
+        const img = document.createElement('img');
+        img.src = peer.item.imageBase64;
+        img.alt = peer.item.name;
+        avatar.appendChild(img);
+    } else {
+        avatar.textContent = peer.item.name.charAt(0).toUpperCase();
+    }
+    return avatar;
+}
+
+function createPeerEl(peer, slider) {
+    const el = document.createElement('div');
+    el.className = 'peer';
+
+    const name = document.createElement('div');
+    name.className = 'peer-name';
+    name.textContent = peer.item.name;
+
+    el.append(createPeerAvatar(peer), name);
+    el.onclick = () => setSliderValue(slider, peer.score);
+    el.onmouseenter = () => showPeerPreview(el, [peer], slider, false);
+    el.onmouseleave = () => hidePeerPreview(false);
+    return el;
+}
+
+function createPeerGroupEl(members, slider) {
+    const el = document.createElement('div');
+    el.className = 'peer peer-group';
+
+    const stack = document.createElement('div');
+    stack.className = 'peer-stack';
+    members.slice(0, 3).forEach(m => stack.appendChild(createPeerAvatar(m)));
+    const count = document.createElement('span');
+    count.className = 'peer-count';
+    count.textContent = members.length;
+    stack.appendChild(count);
+
+    const lo = members[0].score;
+    const hi = members[members.length - 1].score;
+    const name = document.createElement('div');
+    name.className = 'peer-name';
+    name.textContent = lo === hi ? `${members.length} × ${lo}` : `${lo}–${hi}`;
+
+    el.append(stack, name);
+    el.onclick = (e) => {
+        e.stopPropagation();
+        showPeerPreview(el, members, slider, true);
+    };
+    el.onmouseenter = () => showPeerPreview(el, members, slider, false);
+    el.onmouseleave = () => hidePeerPreview(false);
+    return el;
+}
+
+function setSliderValue(slider, value) {
+    slider.value = value;
+    slider.dispatchEvent(new Event('input'));
 }
 
 function layoutAllPeerTracks() {
@@ -884,49 +964,92 @@ function layoutAllPeerTracks() {
 }
 
 function highlightEqualPeers(track, val) {
-    if (!track._peers) return;
-    track._peers.forEach(({ el, tick, score }) => {
-        el.classList.toggle('same', score === val);
-        tick.classList.toggle('same', score === val);
+    if (!track._groups) return;
+    track._groups.forEach(g => {
+        const same = g.members.some(m => m.score === val);
+        g.el.classList.toggle('same', same);
+        g.tick.classList.toggle('same', same);
     });
 }
 
 // Single fixed-position popup so it isn't clipped by the scrolling modal.
+// Hover shows it; clicking a group pins it so its rows can be clicked.
 let peerPreviewEl = null;
+let peerPreviewPinned = false;
 
-function showPeerPreview(anchor, peer, score) {
+function showPeerPreview(anchor, members, slider, pin) {
+    if (peerPreviewPinned && !pin) return;
     if (!peerPreviewEl) {
         peerPreviewEl = document.createElement('div');
         peerPreviewEl.className = 'peer-preview';
+        peerPreviewEl.addEventListener('click', e => e.stopPropagation());
         document.body.appendChild(peerPreviewEl);
     }
+    peerPreviewPinned = pin;
+    peerPreviewEl.classList.toggle('pinned', pin);
     peerPreviewEl.innerHTML = '';
-    if (peer.imageBase64) {
-        const img = document.createElement('img');
-        img.src = peer.imageBase64;
-        img.alt = peer.name;
-        peerPreviewEl.appendChild(img);
+
+    if (members.length === 1) {
+        const peer = members[0];
+        if (peer.item.imageBase64) {
+            const img = document.createElement('img');
+            img.src = peer.item.imageBase64;
+            img.alt = peer.item.name;
+            peerPreviewEl.appendChild(img);
+        }
+        const label = document.createElement('div');
+        label.className = 'peer-preview-label';
+        label.textContent = `${peer.item.name}: ${peer.score}`;
+        peerPreviewEl.appendChild(label);
+    } else {
+        const list = document.createElement('div');
+        list.className = 'peer-preview-list';
+        [...members].reverse().forEach(m => {
+            const row = document.createElement('div');
+            row.className = 'peer-preview-row';
+            const name = document.createElement('span');
+            name.className = 'peer-preview-name';
+            name.textContent = m.item.name;
+            const score = document.createElement('span');
+            score.className = 'peer-preview-score';
+            score.textContent = m.score;
+            row.append(createPeerAvatar(m), name, score);
+            row.onclick = () => {
+                setSliderValue(slider, m.score);
+                hidePeerPreview(true);
+            };
+            list.appendChild(row);
+        });
+        peerPreviewEl.appendChild(list);
+        if (!pin) {
+            const hint = document.createElement('div');
+            hint.className = 'peer-preview-hint';
+            hint.textContent = 'Click to pick one';
+            peerPreviewEl.appendChild(hint);
+        }
     }
-    const label = document.createElement('div');
-    label.className = 'peer-preview-label';
-    label.textContent = `${peer.name}: ${score}`;
-    peerPreviewEl.appendChild(label);
     peerPreviewEl.classList.add('visible');
 
     const a = anchor.getBoundingClientRect();
     const p = peerPreviewEl.getBoundingClientRect();
     const left = Math.min(Math.max(8, a.left + a.width / 2 - p.width / 2), window.innerWidth - p.width - 8);
     let top = a.top - p.height - 8;
-    if (top < 8) top = a.bottom + 8;
+    if (top < 8) top = Math.min(a.bottom + 8, window.innerHeight - p.height - 8);
     peerPreviewEl.style.left = left + 'px';
-    peerPreviewEl.style.top = top + 'px';
+    peerPreviewEl.style.top = Math.max(8, top) + 'px';
 }
 
-function hidePeerPreview() {
-    if (peerPreviewEl) peerPreviewEl.classList.remove('visible');
+function hidePeerPreview(force) {
+    if (!peerPreviewEl || (peerPreviewPinned && !force)) return;
+    peerPreviewPinned = false;
+    peerPreviewEl.classList.remove('visible', 'pinned');
 }
 
-window.addEventListener('resize', layoutAllPeerTracks);
+document.addEventListener('click', () => hidePeerPreview(true));
+window.addEventListener('resize', () => {
+    hidePeerPreview(true);
+    layoutAllPeerTracks();
+});
 
 function saveScoresToState() {
     if (!activeScoringItemId) return;

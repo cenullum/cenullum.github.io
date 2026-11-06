@@ -598,7 +598,7 @@ input[type=range] {
 .peer-preview {
     position: fixed;
     z-index: 10000;
-    max-width: 200px;
+    max-width: 260px;
     padding: 8px;
     background: var(--light-bg);
     border: 1px solid var(--primary-color);
@@ -611,6 +611,10 @@ input[type=range] {
 
 .peer-preview.visible {
     opacity: 1;
+}
+
+.peer-preview.pinned {
+    pointer-events: auto;
 }
 
 .peer-preview img {
@@ -633,8 +637,87 @@ input[type=range] {
     bottom: 0;
     width: 2px;
     height: 6px;
-    transform: translateX(-50%);
+    margin-left: -1px;
+    border-radius: 3px;
     background: var(--primary-color);
+}
+
+.peer-stack {
+    position: relative;
+    display: flex;
+    height: 30px;
+}
+
+.peer-stack .peer-avatar + .peer-avatar {
+    margin-left: -18px;
+}
+
+.peer-count {
+    position: absolute;
+    top: -4px;
+    right: -10px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 4px;
+    border-radius: 12px;
+    background: var(--primary-color);
+    color: #fff;
+    font-size: 0.65em;
+    font-weight: 600;
+    line-height: 18px;
+    text-align: center;
+}
+
+.peer-preview-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    max-height: 260px;
+    overflow-y: auto;
+    min-width: 180px;
+}
+
+.peer-preview-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 4px;
+    border-radius: 3px;
+    transition: all 0.3s ease;
+}
+
+.peer-preview.pinned .peer-preview-row {
+    cursor: pointer;
+}
+
+.peer-preview.pinned .peer-preview-row:hover {
+    background: var(--tertiary-bg);
+}
+
+.peer-preview-row .peer-avatar {
+    flex-shrink: 0;
+}
+
+.peer-preview-name {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.8em;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.peer-preview-score {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--accent-color);
+}
+
+.peer-preview-hint {
+    margin-top: 6px;
+    font-size: 0.7em;
+    opacity: 0.6;
+    text-align: center;
 }
 
 .peer-tick.same {
