@@ -762,6 +762,7 @@ function openScoring(itemId) {
     updateOverallAverage(item);
 
     showView('scoring');
+    requestAnimationFrame(layoutAllPeerTracks);
 }
 
 function renderScoringSliders(item) {
@@ -769,47 +770,163 @@ function renderScoringSliders(item) {
     list.innerHTML = '';
 
     appState.features.forEach(f => {
-        const currentScore = item.scores[f.id] || 5;
+        const currentScore = item.scores[f.id] ?? 5;
 
         const d = document.createElement('div');
         d.className = 'score-slider-container';
-
-        let suggestionText = getSmartSuggestionForFeature(f.id, currentScore, item.id);
 
         d.innerHTML = `
             <div class="score-slider-header">
                 <div style="font-weight:bold;">${f.name}</div>
                 <div style="font-size:1.2em; font-weight:bold; color:var(--accent-color);" id="score-val-${f.id}">${currentScore}</div>
             </div>
+            <div class="peer-track" id="peers-${f.id}"></div>
             <input type="range" id="slider-${f.id}" min="0" max="10" step="0.5" value="${currentScore}">
-            <span class="smart-suggestion" id="sug-${f.id}">${suggestionText}</span>
+            <div class="peer-scale"><span>0</span><span>5</span><span>10</span></div>
         `;
 
         list.appendChild(d);
 
         const slider = d.querySelector(`#slider-${f.id}`);
+        const track = d.querySelector(`#peers-${f.id}`);
+        buildPeerTrack(track, f.id, item, slider);
+
         slider.addEventListener('input', (e) => {
             const val = parseFloat(e.target.value);
             document.getElementById(`score-val-${f.id}`).textContent = val;
             item.scores[f.id] = val;
             updateOverallAverage(item);
-            document.getElementById(`sug-${f.id}`).textContent = getSmartSuggestionForFeature(f.id, val, item.id);
+            highlightEqualPeers(track, val);
         });
     });
 }
 
-function getSmartSuggestionForFeature(featId, currentScore, currentItemId) {
-    let others = appState.items.filter(i => i.id !== currentItemId && i.scores[featId] !== undefined);
-    if (others.length === 0) return "No other items evaluated yet.";
+// Shows every other item's avatar above the slider, positioned at its score for this feature.
+function buildPeerTrack(track, featId, item, slider) {
+    const peers = appState.items
+        .filter(i => i.id !== item.id && i.scores[featId] !== undefined)
+        .sort((a, b) => a.scores[featId] - b.scores[featId]);
 
-    others.sort((a, b) => Math.abs(a.scores[featId] - currentScore) - Math.abs(b.scores[featId] - currentScore));
+    if (peers.length === 0) {
+        track.classList.add('empty');
+        track.textContent = 'No other items evaluated yet.';
+        return;
+    }
 
-    let closest = others[0];
-    let s = closest.scores[featId];
-    if (s > currentScore) return `Similar: ${closest.name} (${s}). Is it worse?`;
-    if (s < currentScore) return `Similar: ${closest.name} (${s}). Is it better?`;
-    return `Equal: ${closest.name} (${s}). Are they the similar?`;
+    track._peers = peers.map(p => {
+        const score = p.scores[featId];
+        const el = document.createElement('div');
+        el.className = 'peer';
+
+        const avatar = document.createElement('div');
+        avatar.className = 'peer-avatar';
+        if (p.imageBase64) {
+            const img = document.createElement('img');
+            img.src = p.imageBase64;
+            img.alt = p.name;
+            avatar.appendChild(img);
+        } else {
+            avatar.textContent = p.name.charAt(0).toUpperCase();
+        }
+
+        const name = document.createElement('div');
+        name.className = 'peer-name';
+        name.textContent = p.name;
+
+        el.append(avatar, name);
+        el.onclick = () => {
+            slider.value = score;
+            slider.dispatchEvent(new Event('input'));
+        };
+        el.onmouseenter = () => showPeerPreview(el, p, score);
+        el.onmouseleave = hidePeerPreview;
+        track.appendChild(el);
+
+        const tick = document.createElement('div');
+        tick.className = 'peer-tick';
+        track.appendChild(tick);
+        return { el, tick, score };
+    });
+
+    highlightEqualPeers(track, parseFloat(slider.value));
 }
+
+const PEER_WIDTH = 56;  // avatar + truncated name label
+const PEER_HEIGHT = 46;
+const PEER_GAP = 4;
+const PEER_TICK = 8;
+
+// Greedy row packing: an avatar goes in the lowest row where it doesn't overlap its left neighbour.
+function layoutPeerTrack(track) {
+    if (!track._peers) return;
+    const width = track.clientWidth;
+    if (!width) return;
+
+    const rowRight = [];
+    track._peers.forEach(({ el, tick, score }) => {
+        const x = (score / 10) * width;
+        let row = rowRight.findIndex(r => x - r >= PEER_WIDTH + PEER_GAP);
+        if (row === -1) {
+            row = rowRight.length;
+            rowRight.push(-Infinity);
+        }
+        rowRight[row] = x;
+        el.style.left = x + 'px';
+        el.style.bottom = (PEER_TICK + row * (PEER_HEIGHT + PEER_GAP)) + 'px';
+        tick.style.left = x + 'px';
+    });
+
+    track.style.height = (PEER_TICK + rowRight.length * (PEER_HEIGHT + PEER_GAP)) + 'px';
+}
+
+function layoutAllPeerTracks() {
+    document.querySelectorAll('.peer-track').forEach(layoutPeerTrack);
+}
+
+function highlightEqualPeers(track, val) {
+    if (!track._peers) return;
+    track._peers.forEach(({ el, tick, score }) => {
+        el.classList.toggle('same', score === val);
+        tick.classList.toggle('same', score === val);
+    });
+}
+
+// Single fixed-position popup so it isn't clipped by the scrolling modal.
+let peerPreviewEl = null;
+
+function showPeerPreview(anchor, peer, score) {
+    if (!peerPreviewEl) {
+        peerPreviewEl = document.createElement('div');
+        peerPreviewEl.className = 'peer-preview';
+        document.body.appendChild(peerPreviewEl);
+    }
+    peerPreviewEl.innerHTML = '';
+    if (peer.imageBase64) {
+        const img = document.createElement('img');
+        img.src = peer.imageBase64;
+        img.alt = peer.name;
+        peerPreviewEl.appendChild(img);
+    }
+    const label = document.createElement('div');
+    label.className = 'peer-preview-label';
+    label.textContent = `${peer.name}: ${score}`;
+    peerPreviewEl.appendChild(label);
+    peerPreviewEl.classList.add('visible');
+
+    const a = anchor.getBoundingClientRect();
+    const p = peerPreviewEl.getBoundingClientRect();
+    const left = Math.min(Math.max(8, a.left + a.width / 2 - p.width / 2), window.innerWidth - p.width - 8);
+    let top = a.top - p.height - 8;
+    if (top < 8) top = a.bottom + 8;
+    peerPreviewEl.style.left = left + 'px';
+    peerPreviewEl.style.top = top + 'px';
+}
+
+function hidePeerPreview() {
+    if (peerPreviewEl) peerPreviewEl.classList.remove('visible');
+}
+
+window.addEventListener('resize', layoutAllPeerTracks);
 
 function saveScoresToState() {
     if (!activeScoringItemId) return;
