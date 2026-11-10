@@ -358,7 +358,7 @@
         <div class="header">
             <button class="theme-toggle" onclick="toggleTheme()" id="themeToggle">☀️ Light Mode</button>
             <h1>cenker's mod - Manual</h1>
-            <p style="font-size: 1.2em; margin-top: 10px;">Version 2.1.1</p>
+            <p style="font-size: 1.2em; margin-top: 10px;">Version 2.5.7</p>
             <p style="margin-top: 10px; color: var(--text-secondary);">A multiplayer game that hosts multiple mini-games
                 and enables community mod creation</p>
         </div>
@@ -404,11 +404,24 @@
                             <li><a href="#network-functions">4.4 Network Functions</a></li>
                             <li><a href="#ui-system">4.5 UI System</a></li>
                             <li><a href="#audio-system">4.6 Audio System</a></li>
+                            <li><a href="#paintable-canvases">4.7 Paintable Canvases</a></li>
+                            <li><a href="#tilemap-api">4.8 Tilemaps &amp; Maps</a></li>
+                            <li><a href="#card-system">4.9 Card System</a></li>
+                            <li><a href="#visual-novel">4.10 Visual Novel &amp; Stories</a></li>
+                            <li><a href="#visual-effects">4.11 Visual Effects (vignette, shadows &amp; hit feedback)</a></li>
+                            <li><a href="#particles">4.12 Particles</a></li>
+                            <li><a href="#localization">4.13 Localization</a></li>
+                            <li><a href="#pathfinding">4.14 Pathfinding (AStar)</a></li>
+                            <li><a href="#fog-of-war">4.15 Fog of War</a></li>
+                            <li><a href="#roles-dedicated">4.16 Roles &amp; Dedicated Servers</a></li>
+                            <li><a href="#local-user-id">4.17 Player Ids: Steam ID &amp; Local User Id</a></li>
+                            <li><a href="#player-cursors">4.18 Player Cursors</a></li>
                         </ul>
                     </li>
                     <li><a href="#examples">5. Practical Examples</a></li>
                     <li><a href="#best-practices">6. Best Practices</a></li>
                     <li><a href="#uploading-workshop">7. Uploading To Steam Workshop</a></li>
+                    <li><a href="#dedicated-servers">8. Dedicated &amp; Master Servers</a></li>
                 </ul>
             </div>
 
@@ -853,17 +866,22 @@ end</code></pre>
                 <tr>
                     <td><code>IS_HOST</code></td>
                     <td>boolean</td>
-                    <td>True if running on host machine</td>
+                    <td>True if running on host machine (on a dedicated server: the server process, which has no player)</td>
+                </tr>
+                <tr>
+                    <td><code>IS_DEDICATED</code></td>
+                    <td>boolean</td>
+                    <td>True on a dedicated server and on every player connected to one. See <a href="#roles-dedicated">4.16</a></td>
                 </tr>
                 <tr>
                     <td><code>LOCAL_STEAM_ID</code></td>
                     <td>string</td>
-                    <td>Local player's Steam ID</td>
+                    <td>Local player's id, as a string: their Steam ID (17 digits), or their <a href="#local-user-id">local user id</a> (15 digits) when they joined without Steam. On a dedicated server it has no entity - check <code>entity_exists(LOCAL_STEAM_ID)</code></td>
                 </tr>
                 <tr>
                     <td><code>HOST_STEAM_ID</code></td>
                     <td>string</td>
-                    <td>Host's Steam ID</td>
+                    <td>Host's id. On a dedicated server it is the server, never a player - use <code>is_admin(id)</code> for "may do host things"</td>
                 </tr>
                 <tr>
                     <td><code>MOD_PATH</code></td>
@@ -1074,6 +1092,24 @@ end</code></pre>
                 that allows gamepad users to interact with UI elements seamlessly.
             </div>
 
+            <h4>Virtual Gamepad (touch screens)</h4>
+            <p>On phones and tablets the game shows an on-screen gamepad while you play (players can switch it on
+                for a PC too, under Settings &rarr; Virtual Gamepad, and drag every button where they like). It does
+                not add new inputs: each on-screen control is one of the inputs in the table above, and it reaches
+                your <code>_process(delta, inputs)</code> exactly like a key press would.</p>
+            <ul>
+                <li><strong>Only registered inputs get a button.</strong> The pad shows the inputs your
+                    <code>world.lua</code> registered with <code>set_input_display_name</code>, and that label is the
+                    button's caption. An input you read but never registered is not sent at all (on any device),
+                    so it has no button either. Keep labels short; they are shrunk to fit a round button.</li>
+                <li><code>stick_1</code> is the left on-screen stick. <code>stick_2</code> stays a world position:
+                    the right on-screen stick moves an aim point, and touching the screen outside the buttons puts
+                    the aim point there.</li>
+                <li>A touch outside the buttons also counts as the left mouse button, so with the default bindings
+                    it holds <code>key_12</code>. Touches on the buttons never do.</li>
+                <li>The menu button (and Android's back button) opens the in-game menu, like ESC.</li>
+            </ul>
+
             <h4>_on_user_initialized(steam_id, nickname)</h4>
             <p>Called when a user finishes joining and is ready to receive network calls.</p>
             <pre><code>function _on_user_initialized(steam_id, nickname)
@@ -1182,6 +1218,11 @@ end</code></pre>
     end
 end</code></pre>
 
+            <h4>_on_navigation_finished(reached)</h4>
+            <p>Called on an entity moved with <code>navigate_to</code> when it stops on its own:
+                <code>true</code> when it reached the target, <code>false</code> when there is no path or it got
+                stuck. Not called when you stop it yourself. See <a href="#pathfinding">4.14 Pathfinding</a>.</p>
+
             <h3 id="entity-management">4.3 Entity Management</h3>
 
             <h4>spawn_entity_local(config)</h4>
@@ -1220,6 +1261,23 @@ end
 
 -- Destroy a local entity
 destroy("", effect_name, false)</code></pre>
+
+            <h4>entity_exists(entity_name, parent_name)</h4>
+            <p>Ask whether an entity - or one of its children, such as an image or a label - is still
+                in the world, <strong>without logging an error when it is not</strong>. Every other
+                lookup (<code>get_value</code>, <code>set_image</code>, <code>set_shader</code>...)
+                prints an error for a missing entity, which is what you want for a typo but not for
+                something that legitimately outlives its target: a timer, or a hit flash still playing
+                on the monster the killing blow just destroyed. Without this guard those few frames
+                fill the log with identical errors.</p>
+            <pre><code>if entity_exists(monster_name) then
+    run_function(monster_name, "take_damage", { 10 })
+end
+
+-- Checking a child: pass the parent as the second argument.
+if entity_exists("body", monster_name) then
+    set_shader({ parent_name = monster_name, image_name = "body", shader_name = "" })
+end</code></pre>
 
             <h4>freeze_entity(entity_name, all)</h4>
             <p>Freeze an entity's physics (stops movement).</p>
@@ -1319,11 +1377,58 @@ if IS_LOCAL then
     })
 end</code></pre>
 
+            <h4>Crisp world-space text (font_size + scale)</h4>
+            <p>Small font sizes render blurry on world-space labels (name tags, damage numbers).
+                Instead, pick a <strong>big <code>font_size</code></strong> and shrink the label with the
+                <code>scale</code> config (a float scales uniformly, or pass a <code>Vector2</code>).
+                Set it once &mdash; there is no per-frame cost. Note that <code>position</code> and
+                <code>size</code> are pre-scale: a 384&times;72 label at scale 0.25 covers 96&times;18 world
+                pixels. The same <em>Scale</em> setting is available in the editor's property panel for
+                world-space labels and is saved with the map.</p>
+            <pre><code>-- Looks like font size 12, but razor sharp:
+set_label({
+    parent_name = name, name = "nick", text = nickname,
+    font_size = 48, scale = 0.25,
+    size = Vector2(512, 96), position = Vector2(-64, -24),
+    horizontal_alignment = 1, outline_size = 16
+})</code></pre>
+
+            <h4>Rotation</h4>
+            <p>Every placed element &mdash; images, labels, buttons, progress bars, polygons and script
+                entities &mdash; accepts a <code>rotation</code> config key in <strong>radians</strong>.
+                The same value is editable in the editor's property panel as a <em>Rotation</em> field in
+                <strong>degrees</strong>, works in both the Map tab (world space) and the View tab (HUD),
+                is saved with the map/view (JSON key <code>r</code>) and is covered by undo/redo
+                (<kbd>Ctrl+Z</kbd> / <kbd>Ctrl+Y</kbd>).</p>
+            <p>Images, labels, buttons and progress bars rotate around their <strong>own centre</strong>;
+                polygons and script entities rotate around their origin (the point you see as their
+                position). Rotation set from Lua is <strong>local-only</strong> and is never synced by
+                itself &mdash; call it on every peer, or let DYNAMIC entities sync their own rotation.</p>
+            <pre><code>-- A label tilted 15 degrees
+set_label({ name = "_title", text = "SALE!", rotation = math.rad(15) })</code></pre>
+
             <h4>Input Display Names</h4>
             <p>Use <code>@key_N@</code> or <code>@stick_N@</code> in text to show context-aware button prompts:</p>
             <pre><code>-- Shows keyboard key or gamepad button automatically
 set_label({
     text = "Press @key_7@ to interact\n@stick_1@ to move"
+})</code></pre>
+
+            <h4>set_button(config)</h4>
+            <p>Create or update a clickable button. When the button is pressed it calls
+            <code>run_function(entity_name, function_name, parameters)</code>. Buttons can also be
+            placed visually from the editor (Map tab and View tab) where the entity name, function
+            name and parameters are configured in the property panel.</p>
+            <pre><code>-- A UI button that runs "buy_item" on the shop entity when clicked
+set_button({
+    name = "_buy_button",
+    text = "Buy Potion",
+    position = Vector2(20, 60),
+    size = Vector2(160, 40),
+    font_size = 18,
+    entity_name = "-shop",
+    function_name = "buy_item",
+    parameters = {"health_potion", 3}
 })</code></pre>
 
             <h3 id="audio-system">4.6 Audio System</h3>
@@ -1348,6 +1453,1226 @@ set_audio({
     volume = -10,
     bus = "Music"
 })</code></pre>
+
+            <h4>set_audio_volume(parent_name, entity_name, volume_db)</h4>
+            <p>Updates the volume of an audio player that is <strong>already playing</strong>, without restarting it.
+                <code>set_audio</code> always restarts playback from the beginning - even when it reuses an existing
+                player by name - which is fine for a one-shot sound effect but makes it unusable for smoothly fading a
+                continuous looping track (every call would snap it back to the start). Use <code>set_audio_volume</code>
+                instead once the player already exists, calling it repeatedly (e.g. from a timer) to ramp the volume up
+                or down over time - for example, a day/night ambience crossfade.</p>
+            <pre><code>-- Start a looping ambient track, silent at first
+set_audio({
+    name = "amb_day", parent_name = "-gm",
+    stream_path = "ambient/morning_nature",
+    is_loop = true, volume = -60, bus = "Ambient"
+})
+
+-- ...then, on a timer, ramp it up toward its real volume
+set_audio_volume("-gm", "amb_day", -10)</code></pre>
+
+            <h3 id="paintable-canvases">4.7 Paintable Canvases</h3>
+
+            <p>The paint system turns a sprite created with <code>set_image</code> into an editable 2D canvas that
+                players can draw on with a brush, eraser and paint bucket, with full undo/redo. It is
+                <strong>server-authoritative</strong>: the host owns the pixels and the undo/redo history, decides which
+                players (by Steam ID) may edit each image, and rejects unauthorized edits. Clients send paint
+                <em>intents</em>; the host validates and rebroadcasts them. Players who join late automatically receive
+                the current state of every canvas.</p>
+
+            <p>The texture is updated at most once per frame, brush dabs are blitted as a cached round mask, and the
+                bucket uses a scanline flood fill, so painting stays fast and deterministic across all peers.</p>
+
+            <h4>Making an image paintable</h4>
+            <p>There are two ways to enable painting on an image:</p>
+            <ul>
+                <li><strong>From the editor:</strong> select an image in the scene or a view, and in its properties
+                    panel turn on <strong>Paintable</strong>. The other paint settings (sync mode, brush size, alpha
+                    blend, indexed, fill tolerance, client predict, max undo) are saved with the map/view.</li>
+                <li><strong>From Lua:</strong> call <code>set_paintable</code> on the host. This is also how you set
+                    per-player edit permissions at runtime (you usually only know Steam IDs while the game is running).</li>
+            </ul>
+
+            <pre><code>-- Create a sprite, then make it a shared whiteboard everyone can draw on (host)
+if IS_HOST then
+    set_image({ parent_name = "", name = "whiteboard",
+                image_path = "white_512", position = Vector2(0, 0) })
+
+    set_paintable({
+        name = "whiteboard",
+        sync_mode = "live",     -- "live" | "manual" | "none"
+        editor_ids = {},        -- empty = everyone may draw; or {"7656119...", ...}
+        brush_size = 8,
+        alpha_blend = true,     -- false = overwrite RGBA instead of blending
+        tolerance = 0.0,        -- flood-fill colour tolerance (0..1)
+        max_undo = 32,
+        opaque = false,         -- true = never transparent: eraser/clear paint `background`
+        background = Color(1, 1, 1, 1)
+    })
+end</code></pre>
+
+            <p><code>opaque = true</code> is for canvases with nothing drawn behind them, such as a player's painted
+                skin: the eraser and <code>clear_canvas</code> paint the <code>background</code> colour (default white)
+                instead of leaving a hole, a translucent brush or bucket is mixed into the colour already there, and any
+                see-through pixels of the starting image are flattened onto the background once. A canvas that sits on
+                its own backing image (a whiteboard over a white sprite) can leave it off.</p>
+
+            <h4>Permissions (anti-cheat)</h4>
+            <p>Only the host's <code>set_paintable</code> call defines who may edit an image. Pass an array of Steam ID
+                strings in <code>editor_ids</code> to restrict editing; leave it empty so everyone can draw. Set
+                <code>editable = false</code> to lock a canvas entirely. The host validates every incoming paint intent
+                against this list, so clients cannot draw on images they are not allowed to edit.</p>
+
+            <pre><code>-- Only these two players may draw on this canvas
+set_paintable({ name = "team_board", editor_ids = { player_a_id, player_b_id } })</code></pre>
+
+            <p>For turn-based games where the active drawer changes constantly, use <code>set_painter</code> instead of
+                rebuilding the whole config each time. It flips the drawing permission for a single canvas and replicates
+                only the tiny permission payload, so it is cheap to call every turn. It is purely a network-level
+                permission — it does <strong>not</strong> open or close the painting panel, only decides who the host will
+                accept strokes from.</p>
+            <ul>
+                <li><code>set_painter("board", steam_id)</code> — only that Steam ID may draw.</li>
+                <li><code>set_painter("board", -1)</code> — everyone may draw (clears the allow-list).</li>
+                <li><code>set_painter("board", 0)</code> — nobody may draw (locks the canvas).</li>
+            </ul>
+            <pre><code>-- Hand the canvas to the current drawer; everyone else is rejected by the host
+if IS_HOST then set_painter("board", current_drawer_id) end
+-- ...later, lock it between turns:
+if IS_HOST then set_painter("board", 0) end</code></pre>
+
+            <h4>Sync modes</h4>
+            <ul>
+                <li><strong>live</strong> — strokes are shown to everyone as they are drawn (a shared whiteboard).</li>
+                <li><strong>manual</strong> — strokes apply on the host but stay hidden from other players until the host
+                    calls <code>push_canvas</code>. Use this for "draw privately, then reveal" games (e.g. everyone
+                    draws for one minute, then all drawings are revealed at once).</li>
+                <li><strong>none</strong> — purely local scribbling that is never networked.</li>
+            </ul>
+
+            <pre><code>-- Reveal every manual-sync canvas to all players (host only)
+if IS_HOST then push_canvas() end          -- "" / no name = all canvases
+-- ...or reveal just one:
+if IS_HOST then push_canvas("whiteboard") end</code></pre>
+
+            <h4>Choosing a tool</h4>
+            <p><code>set_paint_tool</code> sets the local player's brush. Colours can be a <code>Color</code> or a hex
+                string. Set <code>active = false</code> to ignore paint calls while your own UI/menu is open.</p>
+            <pre><code>set_paint_tool({ tool = "brush",  color = Color(1, 0, 0, 1), brush_size = 12 })
+set_paint_tool({ tool = "eraser", brush_size = 24 })
+set_paint_tool({ tool = "bucket", color = Color(0.2, 0.4, 1, 1) })</code></pre>
+
+            <h4>Drawing</h4>
+            <p>Drive strokes from your input loop. World positions come from the in-game mouse
+                (<code>inputs.stick_2</code>). Call <code>paint_begin</code> when the draw button goes down,
+                <code>paint_to</code> while it is held, and <code>paint_end</code> when released. If the active tool is
+                the bucket, <code>paint_begin</code> performs a flood fill instead of starting a stroke.</p>
+
+            <pre><code>-- _process receives the local player's inputs each frame. key_12 is LEFT MOUSE
+-- (a held boolean) and stick_2 is the world mouse position. The table only reports
+-- held state, so track the previous frame to detect press (begin) and release (end).
+local was_drawing = false
+function _process(delta, inputs)
+    local pos = inputs.stick_2          -- world-space mouse position
+    if inputs.key_12 then               -- left mouse held
+        if not was_drawing then
+            paint_begin("whiteboard", pos)  -- first frame held = stroke start
+            was_drawing = true
+        else
+            paint_to("whiteboard", pos)     -- continue the stroke
+        end
+    elseif was_drawing then
+        paint_end("whiteboard")             -- released = stroke end
+        was_drawing = false
+    end
+
+    -- With the bucket tool selected, paint_begin already fills; or fill directly:
+    -- if inputs.key_12 then flood_fill("whiteboard", pos) end
+end</code></pre>
+
+            <h4>Undo, redo and clearing</h4>
+            <p>Undo/redo is host-authoritative and per-image (it undoes the last operation on that canvas, whoever made
+                it). Clients can request it; the host applies and syncs the result to everyone.</p>
+            <pre><code>paint_undo("whiteboard")
+paint_redo("whiteboard")
+clear_canvas("whiteboard")   -- wipe to transparent (undoable)
+remove_paintable("whiteboard")  -- stop treating the image as a canvas</code></pre>
+
+            <h4>Reading pixels</h4>
+            <pre><code>local c = get_paint_color("whiteboard", inputs.stick_2)  -- Color, or (0,0,0,0) if outside
+local can_draw = is_paintable("whiteboard")
+local on_canvas = is_point_on_canvas("whiteboard", inputs.stick_2)  -- true if the point hits the image
+local info = get_paint_info("whiteboard")  -- { indexed, palette, max_undo, ... } or {} if not a canvas</code></pre>
+
+            <h4>Ready-made painting panel</h4>
+            <p>Don't want to wire up tools and draw code yourself? <code>create_painting_panel</code> drops a
+                complete paint UI inside a normal popup, already bound to your image. Opening it is all it
+                takes &mdash; mouse drawing works and is synced, and every button is functional out of the box:
+                brush, eraser, eyedropper, bucket, line, hollow circle, hollow square, undo / redo / reset,
+                a 32-colour palette and brush-size / opacity sliders. The panel reads the image's paint
+                settings and adapts: undo/redo are disabled when there is no undo allowance, and the free
+                colour picker is disabled on indexed canvases (which instead show the canvas palette). If the
+                image is not paintable, a warning panel appears and nothing opens.</p>
+            <pre><code>set_paintable({ name = "whiteboard", max_undo = 32 })  -- the image must be paintable first
+
+create_painting_panel({
+    name = "whiteboard",        -- REQUIRED: image to paint
+    parent_name = "",           -- owning entity (default "")
+    title = "Whiteboard",       -- popup title
+    close = true,               -- show the close button
+    offset_ratio = Vector2(1, 1) -- screen placement (1,1 = centre)
+})</code></pre>
+            <p>The panel closes like any other popup, and the panel name is returned so you can
+                <code>close_panel</code> it yourself.</p>
+
+            <p>Two extra options tune the panel: <code>brush_min</code> / <code>brush_max</code> clamp the
+                brush-size slider (e.g. <code>1</code> to <code>32</code> for a tiny 32&times;32 sprite), and
+                <code>world_pick</code> (on by default) lets the eyedropper sample colours from the rendered
+                <em>world</em> when you click off the canvas &mdash; perfect for matching a disguise to nearby
+                props. You can also read that on-screen colour directly with <code>get_world_color</code>:</p>
+            <pre><code>create_painting_panel({
+    name = "body", parent_name = my_name,
+    brush_min = 1, brush_max = 32,   -- slider range for a 32x32 body
+    world_pick = true,               -- eyedropper also grabs world colours
+})
+
+local col = get_world_color(inputs.stick_2)  -- on-screen colour under the mouse</code></pre>
+
+            <p><strong>Note:</strong> painting targets map sprites created by <code>set_image</code>. See
+                <code>cenkers_mod_stub.lua</code> for the full parameter list of every paint function.</p>
+
+            <h3 id="tilemap-api">4.8 Tilemaps &amp; Maps</h3>
+            <p>Maps are built in the in-game editor from one or more <strong>tilesets</strong>. Each tileset is a
+                source with a stable numeric <code>tileset_id</code> (the first is <code>0</code>). From Lua you
+                can read and write individual tiles, and switch between maps.</p>
+            <pre><code>local coords = get_tile(x, y)        -- Vector2 atlas coords, or (-1, -1) if empty
+set_tile(x, y, Vector2(3, 1))         -- place tile (3,1) from the first tileset (id 0)
+set_tile(x, y, Vector2(3, 1), 2)      -- place from tileset id 2
+local world = map_to_local(Vector2(x, y))   -- tile coords -> world position
+local tile  = local_to_map(world_position)  -- world position -> tile coords</code></pre>
+
+            <h4>15-tile dual-grid tilesets</h4>
+            <p>Besides <strong>plain</strong> tilesets (one tile per cell), a tileset can be a
+                <strong>15-tile dual-grid</strong> layer: one 4&times;4 sheet of transition tiles (mask
+                TL=1 TR=2 BL=4 BR=8; the bottom-left slot, mask 0, is the all-lower tile and may stay empty).
+                The tile is drawn on the corners between cells and chosen from the four cells around each
+                corner, so you only paint cells and every border fits itself. Choose the kind when you press
+                <em>Set as tilemap</em> on an image; everything else is edited in the <em>Tile Maps</em> panel:</p>
+            <ul>
+                <li><strong>Order</strong> (&uarr;/&darr;): the list order is the drawing order.</li>
+                <li><strong>Opaque</strong> layers have both terrains inside the PNG and form a chain in list
+                    order &mdash; the upper terrain of one is the lower terrain of the next; the first one's lower
+                    terrain is the <em>base terrain</em>.</li>
+                <li><strong>Transparent</strong> layers have an empty lower terrain and are drawn over whatever
+                    is below. Each has a <strong>slot</strong>: transparent tiles in the same slot replace each
+                    other in a cell, different slots stack (grass in slot 0, a tree in slot 1).</li>
+                <li><strong>Group</strong> (transparent layers, <code>0</code> = none): layers with the same group
+                    number are one surface. Each picks its tile from the corners of the whole group, so no edge is
+                    drawn where they meet &mdash; a stone wall running into a wood wall stays one wall &mdash; while
+                    each still draws only its own cells (plus the face hanging below them).</li>
+                <li><strong>Corner mapping, collision and shadow</strong> are edited per tile and per
+                    <em>quarter</em> in the tile mapping editor. A quarter collides / casts a shadow according to
+                    the topmost layer covering it.</li>
+                <li><strong>Animation</strong>: frames (whole images, or a horizontal strip split into frames)
+                    and a frame rate. This is stored in the map's <code>info.json</code>; nothing is guessed from
+                    file names.</li>
+            </ul>
+            <p>From Lua, <code>atlas_coords</code> is ignored for a dual-grid tileset:</p>
+            <pre><code>set_tile(x, y, Vector2(0, 0), 3)       -- opaque layer 3: its UPPER terrain; transparent: add it
+set_dual_tile(x, y, 3, true)           -- opaque layer 3: its LOWER terrain (base terrain for the first)
+set_tile(x, y, Vector2(-1, -1), 3)     -- remove layer 3 from the cell
+clear_tile(x, y)                       -- plain tile + terrain + every transparent slot
+local info = get_dual_tile(x, y)       -- {terrain = id | -2 (base) | -1, overlays = {ids...}}
+set_tileset_animation(4, 10)           -- layer 4 now animates at 10 frames per second (local, not saved)
+local anim = get_tileset_animation(4)  -- {frames = 6, fps = 10}</code></pre>
+            <p>Drawing and collision of dual-grid cells are updated in one batch at the end of the frame.
+                Picking variants (e.g. one of several tree sheets per cell) is up to the mod: make each variant
+                its own layer and choose the id from a hash of the cell, as MineBlockLand's
+                <code>worldgen.lua</code> does.</p>
+
+            <h4>Animated polygon textures</h4>
+            <p>A polygon's texture repeats across its whole shape and can be animated the same way as a
+                15-tile dual-grid layer: select the polygon, pick its texture, then in the
+                <strong>Animation</strong> block either <em>Split the image into frames</em> (a horizontal
+                strip of equal frames) or <em>+ Add frame (PNG)</em> one image at a time, and set the
+                <em>Frame rate</em>. Every frame must be the size of frame 1. The polygon's
+                <strong>Modulate</strong> colour multiplies the texture, so a texture that is already blue
+                wants a light modulate (close to white) &mdash; a dark blue on top of blue water reads as
+                black. The frames are saved with the polygon (<code>tf</code> = frame list in the same
+                <code>"file.png#k/n"</code> form tilesets use, <code>tfps</code> = frame rate); a still
+                polygon saves exactly as before. All polygons running the same animation stay in step.
+                Hook Up's lakes, sea and cave water use this.</p>
+
+            <h4>Water reflections</h4>
+            <p>Tick <strong>Water reflection</strong> on a polygon and it mirrors everything above its top
+                edge onto itself, side-scroller style: players, props, the sky, bent by smooth
+                ripples that grow and blur with depth and a bright line at the surface. The reflection is tinted by the
+                water itself &mdash; the polygon's colour, its modulate and the average colour of its
+                texture &mdash; so a green cave pool and a deep blue sea reflect the same scene
+                differently, and the texture's own animation stays visible on top.
+                <strong>Reflection strength</strong> (0&ndash;1) sets how much of it shows. The top edge
+                may be sloped or uneven; the mirror follows it. Saved as <code>wr</code> /
+                <code>wrs</code>; polygons without it save exactly as before. Players can turn every
+                reflection off for themselves in <em>Settings &rarr; General &rarr; Water
+                reflections</em>. Everything is reflected whatever its z, and anything drawn over the water
+                (a hook hanging in it, a swimmer, a foreground prop) is left exactly as it is &mdash; only
+                pixels where the water itself shows are changed. The water also darkens with depth, shows
+                faint light shafts, a moving bright line at the surface and twinkling sun glints where
+                something bright is reflected. Hook Up's waters use this.</p>
+
+            <h4>Erasing tiles</h4>
+            <p>Pass <code>Vector2(-1, -1)</code> as the atlas coords to <strong>erase</strong> a cell. On a
+                dual-grid layer the neighbours re-fit around the hole by themselves, so you can carve an opening
+                (a doorway, a collapsing wall) at runtime and it still looks right.</p>
+            <pre><code>set_tile(x, y, Vector2(-1, -1))      -- erase the plain tile of the cell</code></pre>
+
+            <h4>Minimap (set_minimap / get_minimap)</h4>
+            <p>The engine can render a <strong>minimap of the tilemap</strong> for any mod &mdash; nothing about
+                it is game-specific. It is <strong>host-authoritative and off by default</strong>: the host must
+                call <code>set_minimap(true)</code> before <code>get_minimap()</code> returns anything. Only the
+                permission flag travels over the network; the map <em>image</em> never does. Every peer builds
+                its own minimap locally from the tiles loaded on its machine, so on procedurally streamed maps
+                it naturally acts as a fog of war.</p>
+            <p><code>get_minimap()</code> returns a <strong>texture key string</strong> (or <code>""</code> when
+                not allowed) that you pass to <code>set_image</code> as the <code>image_path</code> &mdash; the
+                same pattern as Steam avatar ids. The texture keeps updating <em>live</em> while it is on
+                screen: newly loaded chunks and tile edits appear automatically.</p>
+            <p>Colours are picked deterministically: each (tileset, tile) pair uses the average colour of its
+                texture region, tiles that have collision are drawn <strong>darker</strong>, and a dual-grid
+                cell takes the full-tile colour of its topmost layer.</p>
+            <pre><code>-- Host (once, e.g. at boot):
+set_minimap(true)
+
+-- Any peer, e.g. when the Map key is pressed (view has a hidden "_map" image):
+local map_id = get_minimap()
+if map_id ~= "" then
+    set_image({ name = "_map", image_path = map_id, visible = true })
+end
+-- ...and set_image({ name = "_map", visible = false }) to hide it again.</code></pre>
+            <p><strong>Tracking things on the map.</strong> <code>set_minimap_target</code> pins an icon (and
+                optional label) to either a <strong>moving entity</strong> (<code>entity_name</code>, re-resolved
+                every frame) or a <strong>fixed spot</strong> (<code>world_position</code>, e.g. the world spawn
+                point) and lets the <em>engine</em> keep it positioned &mdash; no per-frame Lua. Targets are local
+                (not networked), so register one per peer &mdash; the player entity script is a natural place for
+                a "you are here" dot since it runs on every peer for every player:</p>
+            <pre><code>-- In the player entity (runs on every peer for every player): your dot is green.
+set_minimap_target({
+    name = "mm_" .. name, entity_name = name,
+    text = nickname, icon_size = Vector2(7, 7),
+    color = IS_LOCAL and Color(0.4, 0.8, 0.3, 1) or Color(1, 1, 1, 1),
+})
+-- delete_minimap_target("mm_" .. name) removes it.
+
+-- A static marker, e.g. the world spawn point (call once, anywhere):
+set_minimap_target({ name = "spawn", world_position = map_to_local(Vector2(0, 0)),
+    text = "Spawn", icon_size = Vector2(8, 8), color = Color(1, 1, 1, 1) })</code></pre>
+            <p>This alone is enough to drive the ready-made panel below or your own render loop off
+                <code>get_minimap_target_position(name)</code>. If you draw your <em>own</em> minimap HUD from a
+                raw <code>set_image</code> element instead, add <code>image_name</code> (that element's name,
+                must use <strong>STRETCH_SCALE</strong>) and the engine auto-draws the marker as a child of it too
+                &mdash; so it pans/zooms along with your element.</p>
+            <p><strong>Ready-made panel.</strong> <code>create_minimap_panel</code> is the minimap twin of
+                <code>create_painting_panel</code>: it opens a popup with the live map, zoom in/out, a
+                lock-on-target toggle that keeps a tracked entity centred, and <code>&lt;</code> / <code>&gt;</code>
+                arrows to cycle between your <code>set_minimap_target</code> markers &mdash; all with no UI code.
+                Use it, or build your own HUD from the calls above.</p>
+            <pre><code>create_minimap_panel({ title = "Island Map", lock_target = LOCAL_STEAM_ID })</code></pre>
+
+            <h4>Raycasting the world</h4>
+            <p><code>raycast</code> shoots a 2D ray through the physics world (walls, entity bodies, areas) and
+                returns the first hit. For anti-cheat, do this on the <strong>host</strong> from the entity's real
+                position &mdash; clients just send where they aimed. Use <code>collision_mask</code> to pick which
+                layers count and <code>exclude</code> so the shooter never hits itself.</p>
+            <pre><code>-- Host validates a shot: 4 tiles (128px) toward the aim point, hitting walls
+-- (layer 1) and players (layer 2), ignoring the shooter's own body.
+local hit = raycast({
+    from = get_value("", shooter_id, "position"),
+    direction = aim - get_value("", shooter_id, "position"),
+    length = 128,
+    collision_mask = { 1, 2 },
+    exclude = { shooter_id },
+})
+if hit.hit and players[hit.collider] then
+    -- hit.collider is the entity name that was struck; hit.position is where.
+end</code></pre>
+
+            <h3 id="card-system">4.9 Card System (tabletop decks &amp; hands)</h3>
+            <p>The engine ships a <strong>host-authoritative tabletop card runtime</strong> (think Tabletop
+                Simulator, but cheat-proof): the deck order exists <em>only on the host</em>, and a card's
+                identity is only ever sent to the peers that are allowed to know it. Everyone else — players
+                and spectators alike — sees card <em>backs</em>, hand counts and movement animations. The
+                bundled <em>Crazy Eights</em> and <em>Operation: Detonate</em> mods are complete working
+                examples.</p>
+
+            <h4>1. Define the cards (every peer)</h4>
+            <p>Card <em>definitions</em> (what cards look like + their keywords) load identically on every
+                peer from your mod's own files or code — usually in <code>world.lua</code>:</p>
+            <pre><code>-- A) A set designed in the Online Asset Editor's CARD EDITOR and exported as JSON:
+load_cards_from_json("cards/my_set.cards.json")
+
+-- B) Procedurally, straight from a Lua table (same structure as the JSON):
+load_cards_from_data({
+    kind = "cards", set_id = "demo", card_w = 750, card_h = 1050,
+    corner_radius = 0.08, safe_margin = 0.055,
+    back = { type = "color", color = "(0.13, 0.13, 0.18, 1)" },
+    cards = {
+        { id = "red_7", keywords = { power = 7 },
+          bg = { type = "color", color = "(0.72, 0.11, 0.11, 1)" },
+          corner = { text = "7", spots = { "tl", "br" }, flip_opposite = true, size = 0.16 },
+          layout = { type = "vbox", children = {
+              { type = "text", text = "7", font_size = 0, keyword = "value" }, -- 0 = auto-fit
+          } } },
+    },
+}, "demo")
+
+-- C) From a pre-rendered PNG sprite sheet:
+load_cards_from_png({ set_id = "png", front_sheet = "sheet.png", cols = 5, rows = 2,
+    back_image = "back.png", ids = { "a", "b", "c" } })
+
+-- Keywords make rules easy:
+local power = get_card_keyword("red_7", "power")   -- 7</code></pre>
+            <p>Faces are rendered locally by the same renderer the editor preview uses; you can also show any
+                face with a normal image: <code>set_image({ image_path = "card:red_7:front" })</code>.</p>
+
+            <h4>Card text is localized like everything else</h4>
+            <p>Never write the words on a card in Lua. Give a text cell a <code>loc_key</code> (and put the
+                same key in the cell's <code>text</code> as a <code>{keyword}</code>), then translate that
+                keyword in your mod's own
+                <code>general/language/&lt;mod&gt;_&lt;code&gt;.json</code> files — the same files that
+                translate your labels, panels and chat lines. Faces render live, so every peer sees the deck
+                in <em>their</em> language and the cards re-render by themselves when someone changes it:</p>
+            <pre><code>-- world.lua: keywords only, no prose
+{ type = "text", text = "{bomb_title}", loc_key = "bomb_title", keyword = "title" }
+
+-- general/language/mymod_tr.json
+-- "keys": { "{bomb_title}": "Saatli Bomba" }</code></pre>
+            <p>A card's <code>name</code> can be a keyword too (<code>name = "{bomb_title}"</code>), so the
+                panels and chat lines that print it are translated as well. Resolution order for a
+                <code>loc_key</code> is: your mod's language files first, then the set's own optional
+                <code>localization</code> table (what the Card Editor exports, for sets used outside a mod),
+                then the cell's plain <code>text</code> as the last fallback. The bundled
+                <strong>Operation: Detonate</strong> mod is written exactly this way — its
+                <code>world.lua</code> holds no card text at all.</p>
+
+            <h4>2. Shared state (HOST only mutates)</h4>
+            <pre><code>-- host:
+card_create_deck({ name = "draw", position = Vector2(-75, 0),
+    cards = { "red_7", "red_7", "blue_2" },   -- duplicates fine; index 1 = top
+    size = Vector2(96, 134),
+    visibility = "owner" })  -- "owner" | "all" | "none": who learns a drawn card
+card_shuffle("draw")          -- optional seed: card_shuffle("draw", 12345)
+local uid = card_draw("draw", steam_id)        -- deal to a hand
+card_play(uid, Vector2(75, 0), true)           -- face-up play reveals to everyone
+card_peek("draw", 3, steam_id)                 -- private top-3 (See-the-Future)
+local ids = card_peek_host("draw", 3)          -- same, but returned directly (for bot AI - no peer to callback)
+card_return_to_deck(uid, "draw", -1)           -- back into the deck (random spot)
+card_transfer("", victim_id, thief_id)         -- random steal between hands</code></pre>
+            <p>Clients never call these directly — they send intents
+                (<code>run_network_function(name, "draw_HOST", {})</code>), the host validates the turn/rules
+                (on the host <code>card_get_hand()</code> always contains real identities) and then calls the
+                <code>card_*</code> functions.</p>
+
+            <h4>3. React (listener callbacks)</h4>
+            <pre><code>card_set_listener("-my_manager")   -- which entity receives _on_card_* callbacks
+card_set_player_anchor(steam_id, seat_pos)  -- where that player's cards fly from/to
+card_set_hand_ui({ height = 150, separation = -34 })  -- the local bottom hand bar
+card_set_drop_zone(table_center, 200)  -- drag a hand card here to play it (else it snaps back)
+
+function _on_deck_clicked(deck_name) end            -- local input
+function _on_hand_card_clicked(uid, card_id) end    -- local input: tapped your own hand
+function _on_hand_card_dropped(uid, card_id) end     -- local input: DRAGGED a hand card into the drop zone
+function _on_card_drawn(owner, deck_name, uid) end  -- every peer
+function _on_card_played(owner, uid, card_id) end   -- card_id "" when hidden from you
+function _on_card_peek(deck_name, ids) end          -- only on the peeking peer</code></pre>
+            <p>Hand cards support both a tap (<code>_on_hand_card_clicked</code>) and a drag-and-drop
+                (<code>_on_hand_card_dropped</code>, only fires when the card is released inside the
+                <code>card_set_drop_zone</code> radius — dropped anywhere else, it just snaps back to the hand).
+                Mods usually route both callbacks to the same "try to play this card" function.</p>
+            <p>For the full function list (queries like <code>card_hand_counts()</code>,
+                <code>card_uid_info()</code>, flips, moves, discards) see
+                <code>cenkers_mod_stub.lua</code> — every function is documented there.</p>
+
+            <h4>Tabletop camera</h4>
+            <p><code>set_camera_rotation(radians)</code> rotates the view; seat players around a circle and
+                rotate each player's camera so their own seat is at the bottom of their screen. Screen-space
+                UI (the hand bar, panels) is unaffected. Both card mods do exactly this.</p>
+            <p>Rotating the camera tilts everything drawn in world space too — cards, seat avatars, name
+                labels — which reads upside-down/sideways to the seated player unless you counter-rotate them.
+                <code>card_set_world_rotation(radians)</code> does this for every card/deck/hand-fan node the
+                card system owns (pass the <em>same</em> angle you gave <code>set_camera_rotation</code>); for
+                your own <code>set_image</code>/<code>set_label</code> elements (seat avatars, name tags), pass
+                the same angle as their <code>rotation</code> config key. All of this is purely local
+                presentation — only <em>positions</em> are ever networked, so every peer computes and applies
+                its own counter-rotation independently.</p>
+
+            <h4>Drop shadow</h4>
+            <p>Every card set carries a <code>shadow</code> config (on by default —
+                <code>{ enabled, color, dx, dy, grow }</code>, all editable in the Card Editor's Set panel)
+                describing a flat, hard-edged silhouette behind the card — there is no softness/blur control,
+                on purpose: a card shadow is cheap exactly because it is a solid shape, not a blurred one.
+                <strong>How it gets applied depends on how the set was loaded:</strong></p>
+            <ul>
+                <li><code>load_cards_from_json</code> / <code>load_cards_from_data</code>: cards render live
+                    (so localization can swap languages any time) — baking a shadow into every card's pixels at
+                    that same moment would cost real load-time work for no benefit, so instead the runtime adds
+                    a "Shadow" sibling node behind the card's sprite using a real-time GPU shader
+                    (<code>shaders/card_shadow.gdshader</code>) that tints the sprite's own alpha. Zero cost at
+                    load, and it costs nothing extra to update when the card's texture changes.</li>
+                <li><code>load_cards_from_png</code>: the sheet is a flat image with no live render step and no
+                    shader sibling is added for it — the shadow must already be part of its pixels, baked in
+                    ahead of time via the Card Editor's "Each card as PNG" export (which applies the same
+                    <code>shadow</code> config once, at export time, producing the identical flat silhouette).</li>
+            </ul>
+            <p><code>load_cards_from_png</code> also supports per-language sheets by file name (mirroring the
+                <code>image_localizer</code> tool's convention): given <code>front_sheet = "cards.png"</code>,
+                it looks for a sibling <code>cards_&lt;lang&gt;.png</code> matching the engine's current locale
+                (e.g. <code>cards_tr.png</code>) and uses it when present, falling back to the base file name
+                otherwise. <code>back_image</code> is resolved the same way.</p>
+
+            <h4>Outline</h4>
+            <p>Every card set also carries an <code>outline</code> config — off by default —
+                <code>{ enabled, color, width }</code>, editable next to Shadow in the Card Editor's Set panel. A
+                colored ring drawn right at the card's own edge, following its corner rounding, on top of the
+                background/content/corner-indices so it is never hidden. Unlike the shadow, this <em>is</em>
+                baked straight into the face (front and back) for every load path — it's an ordinary render
+                layer, not a separate presentation node, so there is nothing extra to configure at runtime.</p>
+
+            <h4>The Card Editor in the Online Asset Editor</h4>
+            <p>The <strong>Online Asset Editor</strong> (main menu) bundles the Image, Music, Visual Novel and
+                <strong>Card</strong> editors as tabs in one shared session — switch tools with the buttons
+                just above the yellow <em>Invite Friend</em> button (each shows who is working in that tab),
+                no need to leave the lobby and re-host. The <strong>Card Editor</strong> is its own tab, laid
+                out left to right in the order you work: the <em>card list</em> (every card in print order,
+                click to select), the <em>preview</em> (click a region on the card to edit exactly that part),
+                the <em>properties</em> column (only the selected set/card/cell) and
+                <em>Text &amp; Languages</em>. The whole session designs one card set together (fully synced,
+                autosaved, and saveable as its own project file):</p>
+            <ul>
+                <li><strong>Set options:</strong> card pixel size, corner roundness, safe margin (content
+                    never leaves it), default front/back background — a color or any <em>canvas tab</em>
+                    (default is red). Per-card overrides included.</li>
+                <li><strong>Layout:</strong> rows/columns (hbox/vbox) of text, icons (built-in symbol list),
+                    images (the Image tab's canvases, live — picking "add a picture" takes you to that tab,
+                    which is where canvases are made), color blocks and gaps.
+                    Text supports fonts (upload a TTF — shared with the session), size (0 = auto-fit into the
+                    cell), alignment, outline; every cell can carry a <code>keyword</code> for
+                    <code>get_card_keyword</code>.</li>
+                <li><strong>Corner indices:</strong> the classic "7 in the top-left, flipped in the
+                    bottom-right" — pick any corners, text or icon, size and outline.</li>
+                <li><strong>Clone &amp; templates:</strong> one-click card cloning, built-in templates, and
+                    save/load your own templates as JSON.</li>
+                <li><strong>Text &amp; Languages:</strong> the same panel the Visual Novel tab has. Give a
+                    text cell a <em>Loc key</em> and a row to translate appears; add languages from the ones
+                    the game ships, pick which one the preview renders in (your screen only), and filter the
+                    keyword list. <strong>Import from mod</strong> reads a mod's
+                    <code>general/language/</code> folder and fills in every key the set uses (a card's
+                    <code>bomb_title</code> is the file's <code>{bomb_title}</code>), and exporting writes
+                    those files back out as <code>&lt;set&gt;_&lt;code&gt;.json</code>, ready to drop into the
+                    mod. The card JSON keeps all languages too
+                    (<code>{ key = { en = "...", tr = "..." } }</code>).</li>
+                <li><strong>Export:</strong> print sheets (ISO A4/A3, portrait/landscape, DPI, card size in
+                    mm, spacing, cut marks, mirrored back pages for duplex, automatic extra pages when cards
+                    don't fit, live page preview) — or each card as PNG, or JSON (whole set / per card),
+                    optionally in <em>all languages at once</em>. The JSON round-trips: load it back into the
+                    editor or straight into a mod with <code>load_cards_from_json</code>.</li>
+            </ul>
+
+            <h3 id="visual-novel">4.10 Visual Novel &amp; Branching Stories</h3>
+            <p>The engine ships a <strong>scenario runtime</strong> for stories authored in the Online Asset
+                Editor's <strong>Visual Novel</strong> tab (or built by hand). It is not a full VN engine — it
+                is the <em>story graph</em>: characters, dialog nodes, choices (with tags, conditions and
+                secret options) and variables. <strong>Everything visual is your mod's job</strong>: node and
+                choice <code>bg</code>, <code>sound</code> and a character mood <code>image</code> are plain
+                path strings you feed to <code>set_image</code> / <code>set_audio</code>, so fades, character
+                placement, effects, inventories and puzzles all stay ordinary Lua you write yourself. The
+                bundled <em>School Days</em> mod is a complete working example (a vote-driven, multi-ending
+                school story). </p>
+
+            <h4>Authoring in the editor</h4>
+            <p>The Visual Novel tab is a <strong>mindmap</strong>: dialog nodes float as draggable boxes,
+                wires show the flow (gray = the linear <em>next</em> link, colored = choices), and the whole
+                session edits the same story live. Per node you set the speaker + mood, the dialog text, a
+                background and sound, tags, and variable operations that run when the node is entered. Choices
+                carry text, tags, a target node, <em>conditions</em> (all must hold or the choice is disabled —
+                or hidden entirely if marked <em>secret</em>) and their own variable operations. A background
+                or mood image can be <strong>linked to a canvas from the Image tab</strong> for a live preview
+                and an optional PNG next to the exported JSON — but the story JSON only ever stores the path
+                string. <strong>Preview</strong> test-plays the story locally using the exact same rules the
+                runtime uses. <strong>Export</strong> writes the story JSON your mod loads with
+                <code>vn_load</code>.</p>
+
+            <h4>Deterministic &amp; local by design</h4>
+            <p>Each peer loads the same story file and advances <em>its own copy</em> with explicit calls. The
+                engine never networks story state for you — so a multiplayer story stays host-authoritative the
+                usual way: clients send an intent, the host decides, and <strong>every peer runs the same
+                <code>vn_choose()</code></strong> so variables and the current node stay in lockstep. For a
+                voting game that means: clients send their pick with
+                <code>run_network_function(mgr, "vote_HOST", {id = choice_id})</code>; the host tallies, and
+                when the timer ends (or everyone has voted) broadcasts the winner with
+                <code>"apply_choice_ALL"</code>; each peer calls <code>vn_choose(story, winner_id)</code>.</p>
+
+            <pre><code>-- world.lua (every peer): load the story once
+story = vn_load("general/school_days.json")
+vn_set_listener("-sd_manager")   -- who gets the _on_vn_* callbacks
+
+-- -sd_manager (every peer): render whatever a node describes, your way
+function _on_vn_node(story_id, node)
+    set_background_texture(node.bg)                       -- your background
+    if node.image ~= "" then
+        set_image({ parent_name = "", name = "speaker", image_path = node.image })
+    end
+    set_label({ name = "_vn_name", text = node.char_name, font_color = node.char_color })
+    set_label({ name = "_vn_text", text = node.text })
+    if node.sound ~= "" then set_audio({ stream_path = node.sound }) end
+    -- Build choice buttons yourself from vn_choices(); disabled ones are up to you
+    for _, c in ipairs(vn_choices(story_id)) do
+        -- c = { index, id, text, tags, next, enabled, hidden }
+    end
+end
+
+-- Tag-driven effects live entirely in your Lua:
+function _on_vn_choice(story_id, node_id, choice)
+    for _, tag in ipairs(choice.tags) do
+        if tag == "flirt" then create_particle(...) end     -- your effect
+    end
+end</code></pre>
+
+            <p>Key functions (see the stub for full signatures): <code>vn_load</code> /
+                <code>vn_load_data</code>, <code>vn_start</code>, <code>vn_current</code>,
+                <code>vn_choices</code> (conditions already evaluated: disabled choices come back
+                <code>enabled=false</code>, secret failing ones are omitted), <code>vn_advance</code> (linear
+                <em>next</em>), <code>vn_choose</code> (rejects a choice whose conditions fail),
+                <code>vn_goto</code>, <code>vn_is_end</code>, <code>vn_get_var</code> /
+                <code>vn_set_var</code> / <code>vn_get_vars</code>, and <code>vn_node_info</code> /
+                <code>vn_node_ids</code> for inspecting the graph. Callbacks: <code>_on_vn_node</code>,
+                <code>_on_vn_choice</code>, <code>_on_vn_end</code>.</p>
+
+            <h3 id="visual-effects">4.11 Visual Effects (vignette, shadows &amp; hit feedback)</h3>
+            <p>Two screen-wide effects can be driven from Lua. Both take a config dictionary and
+                only touch the keys you pass, so you can animate a single property cheaply. They are
+                <strong>local</strong> to each peer - broadcast one network message (e.g. a day/night
+                phase change) and let every peer apply the visuals itself.</p>
+
+            <h4>set_vignette(config)</h4>
+            <pre><code>set_vignette({
+    visible = true,
+    strength = 1.3,     -- darkness intensity
+    radius = 0.6,       -- clear circle size (0..1)
+    smoothness = 0.5,   -- edge softness (0..1)
+    color = Color(0, 0, 0, 1)
+})
+local v = get_vignette_settings()  -- { visible, smoothness, strength, color, radius }</code></pre>
+
+            <h4>flash_vignette(config)</h4>
+            <p>A one-shot colored flash that fades back out on its own. It renders on its own
+                overlay, completely separate from <code>set_vignette</code>, so triggering a flash
+                never reads or overwrites whatever set_vignette is currently showing - the two
+                layer cleanly on top of each other.</p>
+            <pre><code>-- e.g. a quick colored flash on some event, local player only:
+flash_vignette({ color = Color(0.8, 0.05, 0.05, 1), duration = 0.25 })</code></pre>
+            <table>
+                <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>color</code></td><td>red</td><td>Flash color (Color, [r,g,b,a], or string)</td></tr>
+                <tr><td><code>duration</code></td><td>0.25</td><td>Seconds to fade back to invisible</td></tr>
+                <tr><td><code>strength</code></td><td>1.6</td><td>Vignette shader strength</td></tr>
+                <tr><td><code>radius</code></td><td>0.35</td><td>Clear circle size (0..1)</td></tr>
+                <tr><td><code>smoothness</code></td><td>0.35</td><td>Edge softness (0..1)</td></tr>
+            </table>
+
+            <h4>set_shadow(config)</h4>
+            <p>The same tile-shadow effect configured per map in the editor's
+                "Shadow Effect Settings", now scriptable. Perfect for a sun that moves across the
+                sky: animate <code>shadow_angle</code> during the day and hide shadows at night.</p>
+            <pre><code>-- Day/night example (each peer runs this locally on a timer):
+if is_night then
+    set_shadow({ visible = false })
+    set_vignette({ visible = true, strength = 1.3, radius = 0.6 })
+else
+    local progress = t / DAY_SECONDS                 -- 0 at dawn, 1 at dusk
+    set_shadow({ visible = true, shadow_angle = 100 + 160 * progress })
+    set_vignette({ visible = false })
+end
+
+local s = get_shadow_settings()
+-- { visible, shadow_color, shadow_angle, shadow_length, shadow_blur }</code></pre>
+            <table>
+                <tr>
+                    <th>Key</th>
+                    <th>Meaning</th>
+                </tr>
+                <tr>
+                    <td><code>visible</code></td>
+                    <td>Enable/disable the whole shadow pass</td>
+                </tr>
+                <tr>
+                    <td><code>shadow_color</code></td>
+                    <td>Shadow colour; the alpha is the darkness</td>
+                </tr>
+                <tr>
+                    <td><code>shadow_angle</code></td>
+                    <td>Light direction in degrees (0-360)</td>
+                </tr>
+                <tr>
+                    <td><code>shadow_length</code></td>
+                    <td>Cast length in pixels</td>
+                </tr>
+                <tr>
+                    <td><code>shadow_blur</code></td>
+                    <td>Blur strength (0-10)</td>
+                </tr>
+            </table>
+
+            <h4>set_shadow_of_image(entity_name, image_name, enabled, y_offset?)</h4>
+            <p>Gives an image a ground shadow that is <strong>part of the map's shadow</strong>: a blurred
+                clone of the image itself (its alpha), standing on its lowest opaque pixel and laid on the ground in
+                the direction the walls' shadows fall. It is exactly <code>shadow_length</code> long and fades to
+                nothing at the tip, like a wall's shadow, and gets blurrier toward the tip. A tree throws a
+                tree-shaped shadow. Image shadows are merged into the global shadow <em>before</em> its colour is
+                applied, so wherever shadows overlap &mdash; two images, or an image and a wall &mdash; the alpha
+                stays exactly the same. An image is never darkened by an image shadow (wall shadows still darken
+                it). It follows <code>set_shadow</code> (colour, angle, length, visibility). An image drawn round by
+                the <code>circle</code> shader (Steam avatars) casts a round shadow.</p>
+            <pre><code>set_image({ parent_name = name, name = "body", image_path = "hero" })
+set_shadow_of_image(name, "body", true)            -- standing on the ground
+set_shadow_of_image(name, "wings", true, 10)       -- flying 10 px above its shadow
+set_shadow_of_image(name, "body", false)           -- remove it</code></pre>
+            <ul>
+                <li><code>y_offset</code> (default 0) lifts the image off the ground: its shadow lies that many
+                    pixels <em>below</em> it and gets smaller, so a gap opens between the image and its shadow
+                    &mdash; a bird, a butterfly, a jumping player.</li>
+                <li>It is local and costs one quad per image, sized to just the image plus the side its shadow
+                    falls on; images outside the camera are skipped entirely. Call it on every peer, like
+                    <code>set_image</code>.</li>
+                <li>Shadows follow the image's visibility and alpha, so hiding or fading the image takes the
+                    shadow with it. Texture swaps, animation frames and flips are followed automatically. Rotation is
+                    ignored on purpose: a rolling ball keeps a steady shadow.</li>
+                <li>The global tile shadow only darkens images at <code>z_index</code> 0 or below (its overlay sits
+                    at z 1). Keep world sprites at z 0, as Football and MineBlockLand do, if walls and trees
+                    should shade them; use a higher z only for things that must stay unshaded (name tags,
+                    health bars).</li>
+            </ul>
+
+            <h4>set_shader(config) - sprite shaders</h4>
+            <p><code>set_shader</code> puts one of the shaders in <code>res://shaders/</code> on a sprite
+                you created with <code>set_image</code>. Any extra key in the config is passed straight
+                to the shader as a uniform, and uniforms <strong>stay on the material</strong>, so a
+                later call only has to send the values that changed. Pass an empty
+                <code>shader_name</code> (or leave it out) to remove the shader entirely.</p>
+
+            <h4>Hit feedback: the "hit_flash" shader</h4>
+            <p>The impact effect every action game needs - the sprite flashes solid white, squashes
+                wider and shorter, and wobbles back upright on an elastic curve. All three are driven
+                by <strong>one</strong> uniform, <code>hit</code>: set it to <code>1.0</code> on the
+                frame of impact and fade it to <code>0.0</code> over about a quarter of a second. At
+                <code>hit = 0.0</code> the shader does nothing at all, so it is free while nobody is
+                being hurt. Only RGB is flashed, so transparent pixels stay transparent.</p>
+            <p>A sprite can only carry one material, so the <strong>"circle"</strong> shader (the
+                outline used by most character sprites) carries the identical uniforms. Use
+                <code>"circle"</code> for anything already outlined and <code>"hit_flash"</code> for a
+                plain sprite.</p>
+            <pre><code>-- On the frame of impact (run this on EVERY peer - piggy-back it on the
+-- damage broadcast your mod already sends, it needs no message of its own):
+set_shader({ parent_name = name, image_name = "body", shader_name = "hit_flash",
+    hit = 1.0, hit_dir = math.cos(hit_angle) })
+
+-- Then fade it out. Because the uniforms persist, each later frame is one float:
+set_shader({ parent_name = name, image_name = "body", shader_name = "hit_flash",
+    hit = remaining / 0.26 })
+
+-- When it reaches 0, take the material off again (or, for "circle", re-send
+-- the shader with hit = 0 so the outline survives):
+set_shader({ parent_name = name, image_name = "body", shader_name = "" })</code></pre>
+            <table>
+                <tr><th>Uniform</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>hit</code></td><td>0.0</td><td>Effect strength 0..1. 1 = the frame of impact</td></tr>
+                <tr><td><code>hit_dir</code></td><td>1.0</td><td>Sign of the wobble. Pass <code>cos(hit angle)</code> so the sprite tips away from the blow</td></tr>
+                <tr><td><code>hit_color</code></td><td>white</td><td>The flash colour</td></tr>
+                <tr><td><code>hit_squash</code></td><td>0.35</td><td>Peak horizontal stretch; the vertical squash is 1/x, so the silhouette keeps its area</td></tr>
+                <tr><td><code>hit_spin</code></td><td>0.3</td><td>Peak rotation in radians</td></tr>
+                <tr><td><code>hit_wobbles</code></td><td>2.5</td><td>Oscillations over the life of the effect</td></tr>
+                <tr><td><code>hit_flash_start</code> / <code>hit_flash_full</code></td><td>0.6 / 0.75</td><td>The flash is a <strong>hold</strong>, not a fade: solid colour while <code>hit</code> is above <code>hit_flash_full</code>, gone below <code>hit_flash_start</code>. A flash that fades from the first frame reads as a tint, not an impact</td></tr>
+            </table>
+            <p><strong>Drive every live effect from one singleton, not from each victim.</strong>
+                Campfire Survivors and MineBlockLand both ship a <code>hit_fx.lua</code> singleton whose
+                <code>_process</code> ticks only the handful of sprites that are flashing right now; a
+                <code>_process</code> in every monster script would cost a Lua call per monster per
+                frame just to find out there is nothing to do. Guard the per-frame call with
+                <code>entity_exists(image_name, entity_name)</code> - the killing blow destroys its
+                target while the flash is still playing, and every other lookup would log an error for
+                each of those frames.</p>
+
+            <h4>CRT and screen noise</h4>
+            <p>Two more full-screen looks, drawn behind the HUD like the vignette and, like it, set per map in
+                the editor's map settings (<strong>CRT Effect Settings</strong>, <strong>Screen Noise
+                Settings</strong>) and changeable at runtime. Both are <strong>local</strong>, so each player can see
+                something different - e.g. a CRT that gets stronger as a monster gets closer.</p>
+            <pre><code>set_crt({ visible = true, intensity = 0.3 })            -- scanlines, colour fringing, flicker
+set_screen_noise({ visible = true, intensity = 0.1 })  -- film grain
+local crt = get_crt_settings()</code></pre>
+            <table>
+                <tr><th>set_crt key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>visible</code></td><td>false</td><td>On / off</td></tr>
+                <tr><td><code>intensity</code></td><td>0.35</td><td>0..1, scales everything at once</td></tr>
+                <tr><td><code>scanline_size</code></td><td>3</td><td>Pixels per scanline pair (base-resolution pixels, the same at any window size)</td></tr>
+                <tr><td><code>scanline_strength</code></td><td>0.35</td><td>How dark the scanlines get</td></tr>
+                <tr><td><code>aberration</code></td><td>1.5</td><td>Colour fringing at the screen edge (pixels)</td></tr>
+                <tr><td><code>flicker</code></td><td>0.04</td><td>Brightness flicker</td></tr>
+            </table>
+            <table>
+                <tr><th>set_screen_noise key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>visible</code></td><td>false</td><td>On / off</td></tr>
+                <tr><td><code>intensity</code></td><td>0.12</td><td>0..1 opacity</td></tr>
+                <tr><td><code>grain_size</code></td><td>2</td><td>Grain size (base-resolution pixels)</td></tr>
+                <tr><td><code>speed</code></td><td>24</td><td>New grain patterns per second</td></tr>
+                <tr><td><code>color</code></td><td>white</td><td>Grain colour</td></tr>
+            </table>
+
+            <h3 id="particles">4.12 Particles</h3>
+            <p>GPU particle bursts - sparks, chips, smoke, splashes. You define a reusable
+                <strong>template</strong> once with <code>create_particle</code>, then fire as many
+                instances of it as you like with <code>start_particle</code>. Templates are cached by
+                <code>particle_id</code>, so calling <code>create_particle</code> again with the same id
+                simply replaces the old one.</p>
+            <p>Particles are <strong>local</strong>: nothing is sent over the network. If every peer
+                should see the same burst, broadcast one small message and have each peer call
+                <code>start_particle</code> itself.</p>
+
+            <h4>create_particle(config)</h4>
+            <pre><code>-- A ring that grows and fades, e.g. a splash under a player wading through water:
+create_particle({
+    particle_id = "water_ring",
+    texture_path = "splash",       -- from your mod's general/images/ (.png optional)
+    lifetime = 0.45,
+    amount = 1,
+    one_shot = true,
+    explosiveness = 1.0,           -- 1.0 = emit everything at once
+    initial_velocity_min = 0,
+    initial_velocity_max = 0,
+    scale_amount_min = 0.9,        -- PEAK size (scale_curve multiplies this)
+    scale_amount_max = 1.1,
+    scale_curve = { 0.35, 1.0 },   -- grow over the lifetime
+    alpha_curve = { 1.0, 0.0 },    -- fade out over the lifetime
+    color = Color(1, 1, 1, 0.8),
+    z_index = 1
+})</code></pre>
+            <table>
+                <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>particle_id</code></td><td>-</td><td><strong>Required.</strong> Unique template id</td></tr>
+                <tr><td><code>texture_path</code></td><td>""</td><td>Image in your mod's <code>general/images/</code>; <code>.png</code> added if omitted</td></tr>
+                <tr><td><code>lifetime</code></td><td>1.0</td><td>Seconds each particle lives</td></tr>
+                <tr><td><code>amount</code></td><td>50</td><td>Particle count</td></tr>
+                <tr><td><code>one_shot</code></td><td>true</td><td>Emit once (instance frees itself when done) or loop forever</td></tr>
+                <tr><td><code>explosiveness</code></td><td>0.0</td><td>0 = spread emission over the lifetime, 1 = all at once</td></tr>
+                <tr><td><code>randomness</code></td><td>0.0</td><td>Emission timing randomness (0..1)</td></tr>
+                <tr><td><code>direction</code> / <code>spread</code></td><td>-</td><td>Emission direction <code>{x=,y=}</code> and cone angle in degrees</td></tr>
+                <tr><td><code>initial_velocity_min/max</code></td><td>0 / 1</td><td>Launch speed range</td></tr>
+                <tr><td><code>angular_velocity_min/max</code></td><td>0 / 0</td><td>Spin speed range</td></tr>
+                <tr><td><code>gravity</code></td><td>-</td><td>Gravity vector <code>{x=,y=}</code></td></tr>
+                <tr><td><code>scale_amount_min/max</code></td><td>1 / 1</td><td>Constant size range</td></tr>
+                <tr><td><code>scale_curve</code></td><td>-</td><td>Size <em>over the lifetime</em>, evenly sampled, e.g. <code>{0.35, 1.0}</code> grows. <strong>Multiplies</strong> <code>scale_amount_min/max</code>, so set those to the peak size. Needs 2+ numbers; pass more for a custom shape</td></tr>
+                <tr><td><code>alpha_curve</code></td><td>-</td><td>Opacity <em>over the lifetime</em>, evenly sampled, e.g. <code>{1.0, 0.0}</code> fades out. Needs 2+ numbers</td></tr>
+                <tr><td><code>angle_min/max</code></td><td>0 / 0</td><td>Starting rotation range in degrees</td></tr>
+                <tr><td><code>color</code></td><td>white</td><td>Particle tint</td></tr>
+                <tr><td><code>color_random</code></td><td>false</td><td>Rainbow gradient - confetti</td></tr>
+                <tr><td><code>hue_variation_min/max</code></td><td>0 / 0</td><td>Per-particle hue jitter</td></tr>
+                <tr><td><code>local_coords</code></td><td>false</td><td>false = particles stay in world space once emitted; true = they follow the parent</td></tr>
+                <tr><td><code>z_index</code></td><td>10</td><td>Draw order, clamped to [-999, 999]. The default sits above ground tiles</td></tr>
+            </table>
+
+            <h4>start_particle(config)</h4>
+            <p>Spawns one instance of a template and returns its instance name. A
+                <code>one_shot</code> instance frees itself when it finishes, so you never have to
+                clean it up.</p>
+            <pre><code>-- Free-floating in the world:
+start_particle({ particle_id = "water_ring", position = Vector2(x, y) })
+
+-- Or attached to an entity. With local_coords = false (the default) the particles
+-- still stay where they were emitted, but the z_index is now relative to that
+-- entity - handy for drawing the effect underneath a character's sprite.
+start_particle({ particle_id = "water_ring", parent_name = name,
+    position = Vector2(0, 6) })   -- position is relative to the parent</code></pre>
+            <table>
+                <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>particle_id</code></td><td>-</td><td><strong>Required.</strong> A template made with <code>create_particle</code></td></tr>
+                <tr><td><code>parent_name</code></td><td>""</td><td>Entity to attach to; empty = free-floating in the world</td></tr>
+                <tr><td><code>position</code></td><td>(0,0)</td><td>World position, or offset from the parent</td></tr>
+                <tr><td><code>rotation</code></td><td>0.0</td><td>Emitter rotation in radians</td></tr>
+                <tr><td><code>instance_name</code></td><td>auto</td><td>Name to pass to <code>stop_particle</code> / <code>get_particle_data</code> later</td></tr>
+            </table>
+
+            <p>The rest: <code>stop_particle(instance_name)</code> kills a running instance (needed for
+                looping ones), <code>get_particle_data(instance_name)</code> reports its state,
+                <code>cleanup_entity_particles(entity_name)</code> clears everything attached to an entity
+                (already called for you when an entity is destroyed), and
+                <code>get_active_particle_count()</code> / <code>get_cached_particle_count()</code> help
+                when you are chasing a leak.</p>
+
+            <h3 id="localization">4.13 Localization</h3>
+            <p>Your mod can ship in as many languages as you like. Put one JSON per language in
+                <code>general/language/</code> and write <strong>keywords</strong> instead of text.
+                The game swaps them for the player's language as it draws, so a mod that never
+                calls a localization function still gets translated.</p>
+
+            <h4>The language file</h4>
+            <pre><code>-- general/language/mymod_en.json
+{
+  "meta": { "code": "en", "name": "English", "native_name": "English", "flag": "gb" },
+  "keys": {
+    "{score}": "Score",
+    "{you_win}": "You win!",
+    "{wait_seconds}": "WAIT %s SECONDS"
+  }
+}
+
+-- general/language/mymod_tr.json
+{
+  "meta": { "code": "tr", "name": "Turkish", "native_name": "Türkçe", "flag": "tr" },
+  "keys": {
+    "{score}": "Skor",
+    "{you_win}": "Kazandın!",
+    "{wait_seconds}": "%s SANİYE BEKLEYİN"
+  }
+}</code></pre>
+            <p><code>meta.flag</code> is an ISO country code and picks the flag icon shown in the
+                language menu. Adding a language is <em>only</em> adding a file — no code changes,
+                no registration.</p>
+            <p><strong>Name the file after your mod</strong> (<code>mymod_en.json</code>, not
+                <code>en.json</code>): the language code is read from the part after the last
+                <code>_</code>. When a lobby merges your mod with addons every folder is copied into
+                one place, so a bare <code>en.json</code> can be replaced by another mod's and all of
+                your labels would show up as raw <code>{keyword}</code>.</p>
+
+            <h4>Using a keyword</h4>
+            <pre><code>set_label({ name = "_score", text = "{score}: " .. points })
+add_to_chat("{you_win}")
+create_panel({ text = "{you_win}" })</code></pre>
+            <p>Anything with no keyword in it is shown exactly as written, so you can mix freely.</p>
+
+            <h4>Rules that save you debugging time</h4>
+            <ul>
+                <li><strong>Unknown keyword stays visible.</strong> If no language file defines
+                    <code>{score}</code> the player literally sees <code>{score}</code> — a typo is
+                    obvious instead of silent.</li>
+                <li><strong><code>{single}</code> is yours, <code>{{double}}</code> is the game's.</strong>
+                    A mod file that tries to define a <code>{{double}}</code> keyword is ignored, so a
+                    mod can never break the base game's menus. Your keywords are dropped again when
+                    the player leaves your mod.</li>
+                <li><strong>English is the fallback.</strong> A player on Turkish with a key missing
+                    from your <code>tr.json</code> gets the <code>en.json</code> text. Translating
+                    every language is optional; shipping <code>en.json</code> is not.</li>
+                <li><strong>Send the keyword over the network, not the translation.</strong> Players
+                    in one lobby can each be on a different language:
+                    <code>run_network_function(name, "announce_ALL", { text = "{you_win}" })</code>
+                    lets every peer render it in their own language.</li>
+                <li><strong>Never glue a suffix onto a value.</strong> Word order and grammar differ
+                    per language, so put the placeholder <em>inside</em> the translated text and fill
+                    it afterwards — English "WAIT 3 SECONDS" is Turkish "3 SANİYE BEKLEYİN".</li>
+            </ul>
+            <pre><code>-- wrong: the suffix cannot agree with whatever word lands there
+set_label({ name = "_t", text = "{buy} " .. item_name .. "'s" })
+-- right: the grammar lives in the translated string you control
+set_label({ name = "_t", text = string.format(translate("{buy_item}"), item_name) })</code></pre>
+
+            <h4>Functions</h4>
+            <table>
+                <tr><th>Function</th><th>Returns</th><th>Use it for</th></tr>
+                <tr><td><code>get_current_language()</code></td><td>string</td><td>The player's language code, e.g. <code>"tr"</code></td></tr>
+                <tr><td><code>get_languages()</code></td><td>table</td><td>Every installed language code</td></tr>
+                <tr><td><code>get_language_info(code)</code></td><td>table</td><td><code>{ code, name, native_name, flag }</code></td></tr>
+                <tr><td><code>translate(text, lang?)</code></td><td>string</td><td>The resolved <em>value</em> — comparisons, <code>string.format</code></td></tr>
+                <tr><td><code>translate_all(text)</code></td><td>table</td><td>Every language at once: <code>{ en = "fox", tr = "tilki" }</code></td></tr>
+            </table>
+
+            <h4>Word games: accepting an answer in any language</h4>
+            <p>Keep the word list as keywords. Each player sees the word in their own language, and
+                the host accepts the answer whichever language it was typed in — so both "fox" and
+                "tilki" win.</p>
+            <pre><code>local word_pool = { "{w_fox}", "{w_apple}", "{w_house}" }
+
+-- every peer shows the secret word in its own language
+set_label({ name = "_word", text = secret_key })
+
+-- HOST: the guess is correct in ANY installed language
+function check_guess(guess, secret_key)
+    for _, word in pairs(translate_all(secret_key)) do
+        if normalize(guess) == normalize(word) then return true end
+    end
+    return false
+end</code></pre>
+
+            <h3 id="pathfinding">4.14 Pathfinding (AStar)</h3>
+            <p>Monsters that walk <em>around</em> walls instead of into them. The engine builds a grid of
+                <strong>half tiles</strong> from your map: plain tiles with collision, the collision quarters of
+                15-tile dual-grid layers and polygon walls are blocked, one-way tiles are not. Changing tiles at
+                runtime (<code>set_tile</code>, opening a door...) updates the grid by itself, and nothing is
+                built until you first ask for a path, so maps that never use it pay nothing.</p>
+
+            <h4>navigate_to(entity_name, target, config)</h4>
+            <p>The <code>go_to_target</code> of pathfinding: the engine steers the entity every physics frame at
+                its <code>speed</code> (pixels per second) and calls <code>_on_navigation_finished(reached)</code>
+                on it when it arrives (<code>true</code>) or gives up (<code>false</code>: no path, or stuck).
+                Give an <strong>entity name</strong> as the target and it is followed, the path being recomputed
+                while it moves; give a <code>Vector2</code> for a fixed spot; <code>""</code> stops it without a
+                callback. Players move by input, so they cannot be navigated. For a DYNAMIC entity
+                (<code>network_mode = 2</code>) call it on the <strong>host</strong> - the movement is synced
+                like any other.</p>
+            <pre><code>-- monster.lua
+network_mode = 2
+speed = 110
+lock_rotation = true
+
+function patrol()
+    navigate_to(name, room_centers[math.random(#room_centers)])
+end
+
+function chase(steam_id)
+    navigate_to(name, steam_id, { stop_distance = 12 })   -- follows the player around corners
+end
+
+function _on_navigation_finished(reached)
+    if IS_HOST then patrol() end
+end</code></pre>
+            <table>
+                <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>stop_distance</code></td><td>8</td><td>Arrive when this close to the target (pixels)</td></tr>
+                <tr><td><code>speed</code></td><td>the entity's <code>speed</code></td><td>Pixels per second</td></tr>
+                <tr><td><code>rotate</code></td><td>false</td><td>Turn the entity to face where it walks</td></tr>
+                <tr><td><code>radius</code></td><td>6</td><td>Body radius used when straightening the path</td></tr>
+            </table>
+
+            <h4>Other functions</h4>
+            <table>
+                <tr><th>Function</th><th>Returns</th></tr>
+                <tr><td><code>find_path(from, to)</code></td><td>Waypoints <code>{Vector2, ...}</code>, or an empty table when there is no path. A target inside a wall is moved to the nearest walkable spot.</td></tr>
+                <tr><td><code>is_point_walkable(world_pos)</code></td><td><code>true</code> if pathfinding may walk there</td></tr>
+                <tr><td><code>has_line_of_sight(from, to)</code></td><td><code>true</code> if no wall that casts a shadow lies in between (furniture without a shadow does not block) - the same rule as the fog of war, ideal for "can the monster see the player?"</td></tr>
+                <tr><td><code>set_pathfinding(config)</code> / <code>get_pathfinding()</code></td><td>Change / read <code>diagonal</code>, <code>wall_weight</code>, <code>clearance</code> at runtime</td></tr>
+            </table>
+
+            <h4>Settings in the map editor</h4>
+            <p><strong>Tile Maps &rarr; map settings &rarr; Pathfinding (AStar)</strong> saves them into the
+                map's <code>info.json</code>:</p>
+            <ul>
+                <li><strong>Diagonal movement</strong> - <code>no_obstacles</code> (default: never cuts a wall corner),
+                    <code>at_least_one</code>, <code>always</code>, <code>never</code>.</li>
+                <li><strong>Wall avoidance</strong> - 0 takes the shortest path; higher values keep paths in the
+                    middle of corridors instead of brushing along walls.</li>
+                <li><strong>Clearance</strong> - grows walls by half tiles for entities bigger than half a tile.</li>
+                <li><strong>Show the walkable grid on the map</strong> - an editor-only view: red = wall,
+                    orange = blocked by clearance, yellow = avoided by wall avoidance.</li>
+            </ul>
+            <p>Keep a navigated entity's collision circle at most a quarter tile in radius (8 px on 32 px
+                tiles) with clearance 0, or raise the clearance - otherwise it brushes against corners.</p>
+
+            <h3 id="fog-of-war">4.15 Fog of War</h3>
+            <p>Hide what a player cannot see. Fog of war is <strong>local</strong>: every peer runs its own and
+                nothing travels over the network, so turn it on from the local player's script. Never-seen ground
+                is black, ground seen before is dimmed, and everything within <code>radius</code> tiles the origin
+                has a line of sight to is shown normally. Sight is blocked by whatever casts a <strong>shadow</strong>
+                - the shadow setting of a plain tile, a dual-grid layer's shadow quarters, a polygon's shadow type -
+                so walls block it and desks do not.</p>
+            <pre><code>-- user.lua
+if IS_LOCAL then
+    set_fog_of_war(true, name, { radius = 8, hide_tag = "fog_hide" })
+end
+add_tag(name, "fog_hide")   -- other peers hide this player while they cannot see it</code></pre>
+            <table>
+                <tr><th>Key</th><th>Default</th><th>Meaning</th></tr>
+                <tr><td><code>radius</code></td><td>8</td><td>Sight radius in tiles</td></tr>
+                <tr><td><code>explored_color</code></td><td>Color(0, 0, 0, 0.65)</td><td>Over ground seen before but not visible now</td></tr>
+                <tr><td><code>unexplored_color</code></td><td>Color(0, 0, 0, 1)</td><td>Over ground never seen</td></tr>
+                <tr><td><code>softness</code></td><td>1</td><td>Width of the soft edge of the sight circle, in tiles</td></tr>
+                <tr><td><code>hide_tag</code></td><td>""</td><td>Entities with this tag disappear while the origin cannot see them - only their drawing, their <code>visible</code> flag is left alone</td></tr>
+                <tr><td><code>reset</code></td><td>false</td><td><code>true</code> forgets everything explored so far (a new round)</td></tr>
+            </table>
+            <p><code>reveal_fog(world_pos, radius_tiles, seconds)</code> uncovers a circle for a while, walls or
+                not - a noise the player heard, a flare. Hidden-tag entities inside it show up too.</p>
+            <p><code>set_fog_of_war(false)</code> turns it off; loading a map turns it off too.
+                <code>get_fog_state(world_pos)</code> returns 0 (never seen), 1 (seen before) or 2 (visible now) -
+                always 2 while the fog is off.</p>
+
+            <h3 id="roles-dedicated">4.16 Roles &amp; Dedicated Servers</h3>
+            <div class="note">
+                Hosting through a custom master server and dedicated servers are <strong>experimental</strong> -
+                see <a href="#dedicated-servers">8. Dedicated &amp; Master Servers</a>.
+            </div>
+            <p>A game can be hosted three ways, and a mod should work in all of them without knowing which:</p>
+            <ul>
+                <li><strong>A player hosts through Steam</strong> (a Steam lobby) - the classic way.</li>
+                <li><strong>A player hosts through a custom master server</strong> - the same, without Steam.</li>
+                <li><strong>A dedicated server</strong> - the host is a server process with no player, no screen and
+                    nobody at the keyboard. It is still the authority: <code>IS_HOST</code> is true there and
+                    <code>_ALL</code> functions run on it.</li>
+            </ul>
+            <p>Every player has a <strong>role</strong>: <code>host</code> &gt; <code>owner</code> &gt;
+                <code>moderator</code> &gt; <code>player</code>. The host is the lobby owner (or the dedicated server
+                itself), owners are listed in a dedicated server's <code>server.json</code>, and moderators are
+                appointed in game.</p>
+            <table>
+                <tr><th>Function</th><th>Returns</th></tr>
+                <tr><td><code>is_admin(id)</code></td><td><code>true</code> for the host and for owners. On a listen
+                    server this is exactly <code>id == HOST_STEAM_ID</code>.</td></tr>
+                <tr><td><code>get_role(id)</code></td><td><code>"host"</code>, <code>"owner"</code>,
+                    <code>"moderator"</code> or <code>"player"</code></td></tr>
+                <tr><td><code>can_moderate(actor, target)</code></td><td><code>true</code> when the actor is a
+                    moderator or above and strictly outranks the target</td></tr>
+                <tr><td><code>add_moderator(id)</code> / <code>remove_moderator(id)</code></td><td>HOST ONLY;
+                    <code>false</code> when nothing changed</td></tr>
+                <tr><td><code>get_moderators()</code></td><td>The moderators' ids</td></tr>
+                <tr><td><code>kick_user(id, reason, actor)</code> /
+                    <code>ban_user(id, seconds, reason, actor)</code></td><td>With <code>actor</code> given, the
+                    engine refuses unless <code>can_moderate(actor, id)</code> - pass the requesting player's
+                    <code>sender_id</code> when you relay a request</td></tr>
+            </table>
+            <h4>Rules that make a mod work on a dedicated server</h4>
+            <ul>
+                <li><strong>The host is not a player.</strong> Do not add <code>LOCAL_STEAM_ID</code> to your player
+                    lists on the host, and use <code>entity_exists(LOCAL_STEAM_ID)</code> before treating it as an
+                    entity. Count players from <code>_on_user_initialized</code> or the <code>"user"</code> tag.</li>
+                <li><strong>"Host only" means admin.</strong> Replace <code>sender_id == HOST_STEAM_ID</code> with
+                    <code>is_admin(sender_id)</code> and show host buttons when <code>is_admin(LOCAL_STEAM_ID)</code>.
+                    A button pressed on an admin's machine must reach the host through a <code>_HOST</code>
+                    function, because only the host may run <code>_ALL</code>.</li>
+                <li><strong>Somebody must be able to start a round with no admin around.</strong> When no player is
+                    an admin, let the players vote, or start when enough players are ready. On a listen server the
+                    host is always present, so the old behaviour is untouched.</li>
+                <li><strong>Network singletons arrive late on a joining player.</strong> Check
+                    <code>entity_exists("-name")</code> before a client-side script asks one of them anything.</li>
+            </ul>
+            <pre><code>local function admin_online()
+    for _, id in ipairs(get_entity_names_by_tag("user")) do
+        if is_admin(id) then return true end
+    end
+    return false
+end
+
+function start_HOST(sender_id)
+    if not IS_HOST then return end
+    if is_admin(sender_id) then begin_round() return end
+    if admin_online() then return end          -- the admin decides
+    votes[sender_id] = true
+    if count(votes) &gt; #get_entity_names_by_tag("user") / 2 then begin_round() end
+end</code></pre>
+            <p>Players who joined without Steam have a generated avatar (or one they chose): it arrives through the
+                same <code>_on_loaded_avatar</code> callback and the same <code>set_image({image_path = id})</code>
+                as a Steam avatar.</p>
+
+            <h3 id="local-user-id">4.17 Player Ids: Steam ID &amp; Local User Id</h3>
+            <p>Every player has exactly one id, and every id-taking function (<code>sender_id</code>,
+                <code>LOCAL_STEAM_ID</code>, <code>is_admin(id)</code>, entity names of users...) works the same with
+                both kinds:</p>
+            <table>
+                <tr><th>Kind</th><th>Who</th><th>Looks like</th></tr>
+                <tr><td>Steam ID</td><td>a player signed in through Steam</td><td>always <strong>17 digits</strong>,
+                    starts with <code>7656119</code></td></tr>
+                <tr><td>Local user id</td><td>a player without Steam (LAN, custom master, dedicated server), or an
+                    extra game window of a player in a room that allows several windows</td>
+                    <td>always <strong>15 digits</strong></td></tr>
+            </table>
+            <ul>
+                <li><strong>They can never be equal.</strong> 15 and 17 digits never overlap, so the length alone tells
+                    you which kind an id is.</li>
+                <li><strong>Ids reach Lua as strings.</strong> Keep them strings: use them as table keys and save-file
+                    names as they are (<code>"server/inventory/" .. id .. ".json"</code>). A Steam ID loses digits as a
+                    Lua number.</li>
+                <li><strong>A local user id belongs to a key file, not to a machine or an address.</strong> The game
+                    creates a key once and keeps it in the player's user folder; the id is computed from it. It does not
+                    change with the IP address, the network or the server, and nobody can choose it: joining proves it by
+                    signing a fresh challenge from the server, and only the public half of the key ever leaves the
+                    player's computer. Settings → General → <em>Back up my identity</em> / <em>Restore an identity</em>
+                    moves it to another PC.</li>
+                <li><strong>Names are not ids.</strong> Two players may pick the same name; the second is shown as
+                    "name (2)". Always key your data on the id.</li>
+            </ul>
+            <h4>What you can do with an id</h4>
+            <p>Everything below takes either kind of id, the same way. A mod never needs to check which kind it got.</p>
+            <table>
+                <tr><th>Use</th><th>How</th></tr>
+                <tr><td>Who sent a network call</td><td>the <code>sender_id</code> argument of a
+                    <code>_HOST</code>/<code>_ALL</code>/<code>_CLIENT</code> function</td></tr>
+                <tr><td>Send to one player only</td><td><code>run_network_function(name, "f_CLIENT", params, id)</code></td></tr>
+                <tr><td>The player's entity</td><td>a user entity is named by its id: <code>get_entity(id)</code>,
+                    <code>entity_exists(id)</code>, <code>set_fog_of_war(true, id, ...)</code></td></tr>
+                <tr><td>Join / leave / kick / ban callbacks</td><td><code>_on_user_connected(id, nickname)</code>,
+                    <code>_on_user_initialized</code>, <code>_on_user_disconnected</code>, <code>_on_user_kicked</code>,
+                    <code>_on_user_banned</code></td></tr>
+                <tr><td>Roles and moderation</td><td><code>is_admin(id)</code>, <code>get_role(id)</code>,
+                    <code>kick_user(id, ...)</code>, <code>ban_user(id, ...)</code>; ids in <code>server.json</code>
+                    <code>owners</code></td></tr>
+                <tr><td>Who may draw on a canvas</td><td><code>set_painter(image_name, id)</code>,
+                    <code>editor_ids</code></td></tr>
+                <tr><td>Cards</td><td><code>card_draw(deck, id)</code>, <code>card_get_hand(id)</code>,
+                    <code>card_transfer(uid, from_id, to_id)</code></td></tr>
+                <tr><td>Saved data per player</td><td>use the id string in the file name or table key</td></tr>
+            </table>
+            <h4>Avatars</h4>
+            <p>Every player has an avatar:</p>
+            <ul>
+                <li>a Steam player has their Steam profile picture;</li>
+                <li>a player without Steam has the picture they chose in Settings → General, or a pattern generated
+                    from their id.</li>
+            </ul>
+            <p>The avatar arrives some time after the player joins. When it is ready, <code>_on_loaded_avatar(id)</code>
+                is called on the player's entity. From then on, pass the id as an image path to show the avatar.
+                Both 17-digit and 15-digit ids work there:</p>
+            <pre><code>local avatar_ready = false
+
+function _on_loaded_avatar(id)
+    avatar_ready = true
+    set_image({ parent_name = name, name = "avatar", image_path = id, scale = Vector2(32, 32) })
+    set_shader({ parent_name = name, image_name = "avatar", shader_name = "circle" })
+end</code></pre>
+            <p>An id is only read as an avatar while that player is connected. Before
+                <code>_on_loaded_avatar</code>, or for a player who has left, the same text is looked up as an ordinary
+                file in <code>general/images/</code>, so pass <code>""</code> until the avatar is ready.</p>
+            <h4>Steam only</h4>
+            <ul>
+                <li><code>open_profile(id)</code> opens a Steam profile; it does nothing for a local user id.</li>
+                <li>Steam friends and Steam invites exist only for Steam players.</li>
+                <li>Voice chat currently needs Steam.</li>
+            </ul>
+
+            <h3 id="player-cursors">4.18 Player Cursors</h3>
+            <p>Shows every <em>other</em> player's mouse cursor in the world, with their name under it: who is
+                pointing at which card, where a team-mate is aiming. One call turns it on; the engine sends, relays,
+                smooths and draws the cursors itself.</p>
+            <pre><code>set_cursor(enabled, text, color, icon, steam_id)</code></pre>
+            <table>
+                <tr><th>Parameter</th><th>Meaning</th></tr>
+                <tr><td><code>enabled</code></td><td><code>true</code> shows the cursors, <code>false</code> hides them.</td></tr>
+                <tr><td><code>text</code></td><td>Label under the cursor. <code>nil</code> = the player's nickname,
+                    <code>""</code> = no label, anything else is shown as it is; <code>{keyword}</code> tokens are
+                    translated on each player's own screen.</td></tr>
+                <tr><td><code>color</code></td><td>Tint of the icon and label. <code>nil</code> = an automatic colour,
+                    different for each player.</td></tr>
+                <tr><td><code>icon</code></td><td>A PNG in <code>general/images/</code> (<code>".png"</code> optional),
+                    drawn 32&times;32 and centred on the mouse. <code>nil</code> = the game's own hand cursor, pointing
+                    with its fingertip.</td></tr>
+                <tr><td><code>steam_id</code></td><td>Optional. Applies the call to that one player only; its
+                    <code>nil</code> fields fall back to the setting for everyone. <code>nil</code> = everyone.</td></tr>
+            </table>
+            <pre><code>-- world.lua (runs on every player, so this one line is all most mods need)
+set_cursor(true)
+
+-- user.lua: give this player's cursor their own colour
+set_cursor(true, nil, outline_color, nil, name)
+
+-- a team game: hide the other team's cursors on this screen
+set_cursor(false, nil, nil, nil, enemy_id)</code></pre>
+            <ul>
+                <li><strong>Call it once.</strong> Nothing goes in <code>_process</code>, no
+                    <code>run_network_function</code>, and <code>stick_2</code> does not need to be registered: each
+                    player sends their own mouse position only when it moves, and the host relays all of them in one
+                    message, 20 times a second.</li>
+                <li><strong>Your own cursor is never drawn</strong> - the real mouse cursor is already there.</li>
+                <li>Cursors keep the same size on screen and stay upright, whatever the camera's zoom or rotation (the
+                    card games rotate the camera per seat). They are drawn above the world and its fog of war, and under
+                    your views, panels and menus.</li>
+                <li>The setting is per player: each peer draws what <em>its own</em> calls asked for, which is why it
+                    belongs in <code>world.lua</code>/<code>user.lua</code> (they run everywhere). It is cleared when
+                    the mod is unloaded; a player who leaves loses their cursor automatically.</li>
+                <li>Used by Hook Up (outline colour), Crazy Eights and Operation: Detonate (scoreboard colour).</li>
+            </ul>
 
             <h2 id="examples">5. Practical Examples</h2>
 
@@ -1717,6 +3042,16 @@ if IS_HOST then
     add_to_chat("[DEBUG] Score updated: " .. score, false)
 end</code></pre>
 
+            <div class="note">
+                <strong>Inspecting your card set:</strong> press <strong>F4</strong> to open the debug console and type
+                <code>show_all_cards</code>. A scrollable gallery opens showing every card face your mod has loaded,
+                grouped by set: each card's front, any custom back, and the set's shared back, with the card's name plus
+                its raw id and rendered resolution underneath. It works for every card set
+                (<code>load_cards_from_json</code>, <code>load_cards_from_data</code> and
+                <code>load_cards_from_png</code>) with no extra code in your mod, so it is the fastest way to eyeball a
+                whole deck's artwork after a change.
+            </div>
+
 
             <h2 id="uploading-workshop">7. Uploading To Steam Workshop</h2>
             <p>Once your mod is ready, you can share it with the community by uploading it to the Steam Workshop. The
@@ -1733,12 +3068,31 @@ end</code></pre>
                 <li><strong>icon.png</strong>: This will be the preview image seen on the Workshop.</li>
                 <li><strong>description.txt</strong>: The contents of this file will become the mod's Workshop
                     description.</li>
+                <li><strong>description_&lt;code&gt;.txt</strong>: An optional translation of that description, shown
+                    to players using that language. Add the language code to the end of the file name —
+                    <code>description_tr.txt</code>, <code>description_ru.txt</code>,
+                    <code>description_ja.txt</code>, <code>description_zh_tw.txt</code>. There is no
+                    <code>description_en.txt</code>: plain <code>description.txt</code> already counts as English,
+                    and it is what a player sees whenever their language has no file of its own. Translate as many
+                    or as few as you like.</li>
             </ul>
             <div style="text-align: center; margin: 20px 0;">
                 <img src="description.jpeg" alt="Mapping description and icon"
                     style="max-width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
                 <p style="font-size: 0.9em; color: var(--text-secondary); margin-top: 8px;">Your local files are mapped
                     to the Workshop UI automatically.</p>
+            </div>
+
+            <h3>Supported File Types</h3>
+            <p>For safety, a mod may only contain these file types:
+                <strong>.png</strong>, <strong>.ogg</strong>, <strong>.lua</strong>, <strong>.txt</strong> and
+                <strong>.json</strong>. Anything else is refused, and the upload is stopped with a
+                <em>"Not Allowed By Whitelist"</em> error listing the offending files. Remove them and try again.</p>
+            <div class="note">
+                <strong>Note:</strong> Renaming a file does not help — the contents are checked as well, so a
+                file named <code>sound.ogg</code> that is not really an OGG will still be rejected. The same
+                check runs when other players download your mod, so an unsupported file makes the mod
+                unloadable for everyone. Hidden folders such as <code>.git</code> are ignored and are safe to keep.
             </div>
 
             <h3>Categories and Genres</h3>
@@ -1791,6 +3145,138 @@ end</code></pre>
                 <img src="done.jpeg" alt="Upload successful"
                     style="max-width: 100%; border-radius: 4px; border: 1px solid var(--border-color);">
             </div>
+
+            <h2 id="dedicated-servers">8. Dedicated &amp; Master Servers</h2>
+            <div class="warning">
+                <strong>Experimental:</strong> dedicated servers and custom master servers are new and may not
+                work as expected yet. In the game they are marked <em>(experimental)</em> - hover over them for a
+                reminder. If something goes wrong, please report it on the game's <strong>Steam Community</strong>
+                page, with what you did and the server's console output if you have it.
+            </div>
+            <p>cenker's mod can be hosted in three ways. They all run the <strong>same game code</strong>, so a mod
+                works in each of them without changes, and you choose what fits your community: a quick game
+                with friends, a public server that is always on, or a network of servers that does not need
+                Steam at all.</p>
+            <svg viewBox="0 0 820 230" style="width:100%;max-width:820px;display:block;margin:20px auto" role="img" aria-label="Three ways to host"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent-color)"/></marker></defs>
+<rect x="10" y="20" width="250" height="190" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="135.0" y="44" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">1. A player hosts (Steam)</text><text x="135.0" y="64" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">The classic way.</text><text x="135.0" y="80" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Steam lobby + Steam P2P.</text><text x="135.0" y="96" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">The host also plays.</text><text x="135.0" y="112" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Listed in the room list.</text>
+<rect x="285" y="20" width="250" height="190" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="410.0" y="44" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">2. A player hosts (master)</text><text x="410.0" y="64" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Same game, no Steam.</text><text x="410.0" y="80" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Listed on your own master.</text><text x="410.0" y="96" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">NAT punching, relay as backup.</text><text x="410.0" y="112" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">The host also plays.</text>
+<rect x="560" y="20" width="250" height="190" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="685.0" y="44" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">3. Dedicated server</text><text x="685.0" y="64" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Headless, no window.</text><text x="685.0" y="80" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">No player of its own.</text><text x="685.0" y="96" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Runs on a PC or a VPS,</text><text x="685.0" y="112" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">as many as you like.</text>
+</svg>
+
+            <h3>8.1 Dedicated servers</h3>
+            <p>A dedicated server hosts one mod for as long as it runs. It has <strong>no window, no character and
+                nobody at the keyboard</strong>, and it does not need the Steam client - so it fits on a cheap Linux
+                VPS or a spare Windows PC. It is still the authority of the game (<code>IS_HOST</code> is true there),
+                exactly like a player who hosts, but it never counts as a player: it takes no team, no seat and no vote.</p>
+            <figure style="margin:20px 0;text-align:center">
+                <img src="images/server_dedicated_console.png" alt="A dedicated server starting from start_server.sh: it loads the mod, opens its UDP port and lists itself on the master server." style="width:100%;max-width:820px;border-radius:8px;border:1px solid var(--bg-tertiary)">
+                <figcaption style="color:var(--text-secondary);font-size:0.9em;margin-top:6px">A dedicated server starting from <code>start_server.sh</code>: it loads the mod, opens its UDP port and lists itself on the master server.</figcaption>
+            </figure>
+
+            <svg viewBox="0 0 820 250" style="width:100%;max-width:820px;display:block;margin:20px auto" role="img" aria-label="Dedicated server listed on Steam"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent-color)"/></marker></defs>
+<rect x="20" y="90" width="200" height="80" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="120.0" y="114" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">Dedicated server</text><text x="120.0" y="134" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">mods/Football + server.json</text>
+<rect x="310" y="10" width="200" height="70" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="410.0" y="34" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">Steam</text><text x="410.0" y="54" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">server browser</text>
+<rect x="600" y="90" width="200" height="80" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="700.0" y="114" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">Player</text><text x="700.0" y="134" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">room list / Steam browser</text>
+<path d="M120,90 C120,40 250,40 305,45" style="stroke:var(--accent-color);stroke-width:2;fill:none" marker-end="url(#arr)"/><text x="150" y="40" style="fill:var(--text-secondary);font:12px sans-serif">registers (GodotSteam Server)</text>
+<path d="M700,90 C700,40 570,40 515,45" style="stroke:var(--accent-color);stroke-width:2;fill:none" marker-end="url(#arr)"/><text x="560" y="40" style="fill:var(--text-secondary);font:12px sans-serif">lists servers</text>
+<path d="M595,145 L225,145" style="stroke:var(--accent-color);stroke-width:2;fill:none" marker-end="url(#arr)"/><text x="320" y="138" style="fill:var(--text-secondary);font:12px sans-serif">joins by address (UDP 27015), encrypted</text>
+<path d="M225,165 L595,165" style="stroke:var(--text-secondary);stroke-width:1.5;fill:none;stroke-dasharray:5 4" marker-end="url(#arr)"/><text x="330" y="185" style="fill:var(--text-secondary);font:12px sans-serif">mod files, world, chat, voice</text>
+</svg>
+            <h4>Setting one up</h4>
+            <ol>
+                <li>Get the server build (the <em>Dedicated Server</em> tool, or the <code>Dedicated Server</code>
+                    folder of the game's repository).</li>
+                <li>Put the mod you want to host (and any addons) into its <code>mods/</code> folder.</li>
+                <li>Copy <code>server.example.json</code> to <code>server.json</code> and edit it.</li>
+                <li>Open the game port in your firewall/router (UDP 27015 by default; also 27016 when listed on Steam).</li>
+                <li>Start <code>start_server.sh</code> (Linux) or <code>start_server.bat</code> (Windows).</li>
+            </ol>
+            <pre><code>{
+  "name": "Friday Football",
+  "mod": "Football",
+  "addons": ["Moderation Panel"],
+  "max_players": 16,
+  "game_port": 27015,
+  "master": "steam",
+  "steam_only": false,
+  "owners": ["76561198000000000"]
+}</code></pre>
+            <table>
+                <tr><th>Option</th><th>What it is for</th></tr>
+                <tr><td><code>mod</code>, <code>addons</code>, <code>map</code></td><td>What to host: folder names inside
+                    <code>mods/</code>, merged in order, and the map (the first one when empty).</td></tr>
+                <tr><td><code>name</code>, <code>genre</code>, <code>country</code></td><td>How the server looks in the room list.</td></tr>
+                <tr><td><code>max_players</code>, <code>game_port</code>, <code>query_port</code></td><td>Size and network ports. Use a different port for every server on one machine.</td></tr>
+                <tr><td><code>master</code></td><td><code>"steam"</code> to be listed on Steam, or <code>"address:port"</code> of a custom master server.</td></tr>
+                <tr><td><code>steam_only</code></td><td>Only accept players signed in through Steam. Can also be switched while running.</td></tr>
+                <tr><td><code>owners</code></td><td>Player ids (as text) with admin rights.</td></tr>
+                <tr><td><code>gslt</code></td><td>Optional Steam token that keeps the server's Steam identity across restarts.</td></tr>
+                <tr><td><code>data_dir</code></td><td>Where the server keeps its world, bans, moderators and its identity key.</td></tr>
+            </table>
+            <div class="note"><strong>Saves survive restarts.</strong> The mod is copied into <code>data/world</code> on
+                every start, so updates arrive, while anything the mod saved there itself (a MineBlockLand world, high
+                scores) is kept.</div>
+            <h4>The console</h4>
+            <p>Type into the server window: <code>status</code>, <code>say</code>, <code>kick</code>, <code>ban</code>,
+                <code>unban</code>, <code>mod add|remove|list</code> (moderators), <code>steam_only on|off</code>,
+                any mod command such as <code>/start</code>, and <code>quit</code>.</p>
+            <pre><code>Server "Friday Football" is running: mod Football, map 44x32 FootballMap, UDP port 27710. Type help for commands.
+Listed on the master server.
+unnamed joined (259657334682074).
+status
+Friday Football | mod Football | map 44x32 FootballMap | players 1/16 | Steam only: off
+  259657334682074  unnamed  player</code></pre>
+
+
+            <h3>8.2 Custom master servers - hosting without Steam</h3>
+            <p>A master server is a small separate program (the <code>Master Server</code> folder) that lists servers
+                and helps players reach them. Run it on any machine with a public address and share its
+                <code>address:port</code>. In the game, choose <strong>Custom master server</strong> in the hosting
+                menu or the room list and type that address; Steam stays the default for everyone else.</p>
+            <figure style="margin:20px 0;text-align:center">
+                <img src="images/server_master_console.png" alt="The master server running: its key fingerprint, a dedicated server registering and the status and list console commands." style="width:100%;max-width:820px;border-radius:8px;border:1px solid var(--bg-tertiary)">
+                <figcaption style="color:var(--text-secondary);font-size:0.9em;margin-top:6px">The master server running: its key fingerprint, a dedicated server registering and the <code>status</code> and <code>list</code> console commands.</figcaption>
+            </figure>
+            <figure style="margin:20px 0;text-align:center">
+                <img src="images/server_hosting_custom.png" alt="Hosting menu with <em>Custom master server</em> selected: the address field, the game port and the Steam-only option appear." style="width:100%;max-width:820px;border-radius:8px;border:1px solid var(--bg-tertiary)">
+                <figcaption style="color:var(--text-secondary);font-size:0.9em;margin-top:6px">Hosting menu with <em>Custom master server</em> selected: the address field, the game port and the Steam-only option appear.</figcaption>
+            </figure>
+            <figure style="margin:20px 0;text-align:center">
+                <img src="images/server_room_list_custom.png" alt="Room list reading a custom master server: the dedicated server is listed in the same rows as lobbies." style="width:100%;max-width:820px;border-radius:8px;border:1px solid var(--bg-tertiary)">
+                <figcaption style="color:var(--text-secondary);font-size:0.9em;margin-top:6px">Room list reading a custom master server: the dedicated server is listed in the same rows as lobbies.</figcaption>
+            </figure>
+
+            <svg viewBox="0 0 820 290" style="width:100%;max-width:820px;display:block;margin:20px auto" role="img" aria-label="Custom master server, punching and relay"><defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" style="fill:var(--accent-color)"/></marker></defs>
+<rect x="20" y="110" width="200" height="80" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="120.0" y="134" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">Host</text><text x="120.0" y="154" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">dedicated or a player</text>
+<rect x="310" y="10" width="200" height="80" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="410.0" y="34" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">Master server</text><text x="410.0" y="54" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">your own, Steam-free</text><text x="410.0" y="70" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">UDP 27100 + 27101</text>
+<rect x="600" y="110" width="200" height="80" rx="10" style="fill:var(--bg-tertiary);stroke:var(--accent-color);stroke-width:2"/><text x="700.0" y="134" text-anchor="middle" style="fill:var(--text-primary);font:14px sans-serif">Player</text><text x="700.0" y="154" text-anchor="middle" style="fill:var(--text-secondary);font:12px sans-serif">Custom master selected</text>
+<path d="M120,110 C120,60 250,55 305,55" style="stroke:var(--accent-color);stroke-width:2;fill:none" marker-end="url(#arr)"/><text x="40" y="75" style="fill:var(--text-secondary);font:12px sans-serif">1. register (+ STUN)</text>
+<path d="M700,110 C700,60 570,55 515,55" style="stroke:var(--accent-color);stroke-width:2;fill:none" marker-end="url(#arr)"/><text x="640" y="75" style="fill:var(--text-secondary);font:12px sans-serif">2. list, connect</text>
+<path d="M410,90 L180,108" style="stroke:var(--text-secondary);stroke-width:1.5;fill:none;stroke-dasharray:5 4" marker-end="url(#arr)"/><text x="210" y="120" style="fill:var(--text-secondary);font:12px sans-serif">3. "punch"</text>
+<path d="M410,90 L640,108" style="stroke:var(--text-secondary);stroke-width:1.5;fill:none;stroke-dasharray:5 4" marker-end="url(#arr)"/><text x="555" y="120" style="fill:var(--text-secondary);font:12px sans-serif">3. "punch"</text>
+<path d="M595,160 L225,160" style="stroke:var(--accent-color);stroke-width:2;fill:none" marker-end="url(#arr)"/><text x="300" y="153" style="fill:var(--text-secondary);font:12px sans-serif">4. direct connection through NAT</text>
+<path d="M600,200 C500,270 320,270 220,200" style="stroke:var(--text-secondary);stroke-width:1.5;fill:none;stroke-dasharray:5 4" marker-end="url(#arr)"/><text x="300" y="268" style="fill:var(--text-secondary);font:12px sans-serif">5. if punching fails: relayed by the master, still end-to-end encrypted</text>
+</svg>
+            <ul>
+                <li><strong>Listing:</strong> dedicated servers and players hosting from the menu both register.</li>
+                <li><strong>Getting through routers:</strong> the master introduces host and player so they can open a
+                    direct connection (NAT punching). When a network does not allow that, the master
+                    <strong>relays</strong> the traffic instead.</li>
+                <li><strong>Joining directly:</strong> no master at all is needed if you know the address - type
+                    <code>address:port</code> into the lobby id box of the room list.</li>
+            </ul>
+
+            <h3>8.3 Playing without Steam</h3>
+            <p>On dedicated and custom-master servers a player does not need Steam. Their identity is a key created on
+                their computer; their name and picture are set in <strong>Settings &rarr; General</strong> (a generated
+                pattern is used when no picture is chosen). <em>Copy my player ID</em> there gives the id a server owner
+                puts in <code>owners</code>: the Steam ID, or the 15-digit <a href="#local-user-id">local user id</a> without Steam. A server that wants Steam accounts only turns on <code>steam_only</code>.
+                Voice chat currently needs Steam.</p>
+            <figure style="margin:20px 0;text-align:center">
+                <img src="images/server_settings_identity.png" alt="Settings &rarr; General: name, picture and player ID used on servers joined without Steam." style="width:100%;max-width:820px;border-radius:8px;border:1px solid var(--bg-tertiary)">
+                <figcaption style="color:var(--text-secondary);font-size:0.9em;margin-top:6px">Settings &rarr; General: name, picture and player ID used on servers joined without Steam.</figcaption>
+            </figure>
+
 
             <div class="highlight">
                 <h3>Additional Resources</h3>
